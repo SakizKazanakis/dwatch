@@ -8,12 +8,16 @@ in="${1:?usage: $0 input.png [output.bin]}"
 out="${2:-clock_bg.bin}"
 tools="$(cd "$(dirname "$0")" && pwd)/.tools"
 ezip="$tools/ezip_linux"
+sdk_rev=a97dac0fe858a59165ec33e45cb5856cad76449e
+ezip_sha256=216938bb55b095370d34395d283a283a1683b64d414c25c32058e3792ab66e85
 
 if [ ! -x "$ezip" ]; then
   mkdir -p "$tools"
-  curl -sSfL -o "$ezip" \
-    https://raw.githubusercontent.com/OpenSiFli/SiFli-SDK/main/tools/png2ezip/ezip_linux
-  chmod +x "$ezip"
+  curl -sSfL -o "$ezip.tmp" \
+    "https://raw.githubusercontent.com/OpenSiFli/SiFli-SDK/$sdk_rev/tools/png2ezip/ezip_linux"
+  echo "$ezip_sha256  $ezip.tmp" | sha256sum -c --quiet
+  chmod +x "$ezip.tmp"
+  mv "$ezip.tmp" "$ezip"
 fi
 
 work="$(mktemp -d)"
