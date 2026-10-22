@@ -32,10 +32,14 @@ import java.util.Locale;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.ControlCenterv2;
+import nodomain.freeyourgadget.gadgetbridge.activities.PermissionsActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.welcome.WelcomeActivity;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceManager;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.DailyTotals;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
+import nodomain.freeyourgadget.gadgetbridge.util.PermissionsUtils;
+import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 /** Monolith dashboard ("Пульт"): link state, both batteries, steps, coordinates, quick actions. */
 public class MonolithActivity extends AppCompatActivity {
@@ -53,6 +57,8 @@ public class MonolithActivity extends AppCompatActivity {
     private TextView steps;
     private TextView coords;
     private boolean finding;
+    private GBDevice shownDevice;
+    private Button find;
 
     private final BroadcastReceiver deviceReceiver = new BroadcastReceiver() {
         @Override
@@ -91,11 +97,12 @@ public class MonolithActivity extends AppCompatActivity {
                 new int[]{0xFFF4F5F3, 0xFF9AA1A6, 0xFFD9DCDB, 0xFF7C8388, 0xFFC6CACB},
                 new float[]{0f, 0.28f, 0.5f, 0.72f, 1f}, Shader.TileMode.CLAMP)));
 
-        Button find = findViewById(R.id.monolith_find);
+        find = findViewById(R.id.monolith_find);
         find.setOnClickListener(v -> {
-            finding = !finding;
-            GBApplication.deviceService().onFindDevice(finding);
-            find.setText(finding ? "Стоп" : "Найти часы");
+            if (shownDevice == null) {
+                return;
+            }
+            setFinding(!finding);
         });
         findViewById(R.id.monolith_sync).setOnClickListener(v -> {
             GBApplication.deviceService().onFetchRecordedData(RecordedDataTypes.TYPE_SYNC);
@@ -104,6 +111,28 @@ public class MonolithActivity extends AppCompatActivity {
         findViewById(R.id.monolith_settings).setOnClickListener(v ->
                 startActivity(new Intent(this, ControlCenterv2.class)));
         coords.setOnClickListener(v -> requestLocation());
+
+        if (savedInstanceState == null) {
+            routeOnboarding();
+        }
+    }
+
+    // Same dispatch as ControlCenterv2: welcome flow on first run, permissions afterwards.
+    private void routeOnboarding() {
+        Prefs prefs = GBApplication.getPrefs();
+        if (prefs.getBoolean("first_run", true)) {
+            startActivity(new Intent(this, WelcomeActivity.class));
+        } else if (prefs.getBoolean("permission_pestering", true) && !PermissionsUtils.checkAllPermissions(this)) {
+            startActivity(new Intent(this, PermissionsActivity.class));
+        }
+    }
+
+    private void setFinding(boolean on) {
+        finding = on;
+        if (shownDevice != null) {
+            GBApplication.deviceService(shownDevice).onFindDevice(on);
+        }
+        find.setText(on ? "Стоп" : "Найти часы");
     }
 
     @Override
@@ -120,6 +149,9 @@ public class MonolithActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
+        if (finding) {
+            setFinding(false);
+        }
         LocalBroadcastManager.getInstance(this).unregisterReceiver(deviceReceiver);
         unregisterReceiver(phoneBatteryReceiver);
         super.onPause();
@@ -135,6 +167,11 @@ public class MonolithActivity extends AppCompatActivity {
             }
         }
 
+        if (finding && device != shownDevice) {
+            setFinding(false);
+        }
+        shownDevice = device;
+
         if (device == null) {
             deviceName.setText("Часы не добавлены");
             deviceAddress.setText("");
@@ -149,7 +186,7 @@ public class MonolithActivity extends AppCompatActivity {
         deviceAddress.setText(device.getAddress());
         setLink(device.isConnected(), device.isConnected() ? "Связь" : device.getStateString(this));
 
-        int level = device.getBatteryLevel();
+        int level = device.getBatteryLevel(0);
         if (level >= 0) {
             watchBattery.setText(level + "%");
             watchBatteryBar.setProgress(level);
