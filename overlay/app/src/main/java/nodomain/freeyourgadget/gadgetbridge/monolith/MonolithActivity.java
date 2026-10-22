@@ -24,9 +24,12 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.text.NumberFormat;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -66,6 +69,8 @@ public class MonolithActivity extends AppCompatActivity {
     private boolean finding;
     private GBDevice shownDevice;
     private Button find;
+    private TextView dialStatus;
+    private boolean pushingDial;
 
     private final BroadcastReceiver deviceReceiver = new BroadcastReceiver() {
         @Override
@@ -120,6 +125,8 @@ public class MonolithActivity extends AppCompatActivity {
         findViewById(R.id.monolith_settings).setOnClickListener(v ->
                 startActivity(new Intent(this, ControlCenterv2.class)));
         coords.setOnClickListener(v -> requestLocation());
+        dialStatus = findViewById(R.id.monolith_dial_status);
+        findViewById(R.id.monolith_dial_bg).setOnClickListener(v -> pushDialBackground());
 
         if (savedInstanceState == null) {
             routeOnboarding();
@@ -134,6 +141,57 @@ public class MonolithActivity extends AppCompatActivity {
         } else if (prefs.getBoolean("permission_pestering", true) && !PermissionsUtils.checkAllPermissions(this)) {
             startActivity(new Intent(this, PermissionsActivity.class));
         }
+    }
+
+    /** Uploads the bundled Monolith background as the watch's custom dial and sets the clock style. */
+    private void pushDialBackground() {
+        if (pushingDial) {
+            return;
+        }
+        if (shownDevice == null) {
+            showDialStatus("Сначала подключи часы");
+            return;
+        }
+        byte[] background;
+        try (InputStream in = getAssets().open("monolith/clock_bg.bin")) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            for (int n; (n = in.read(buf)) > 0; ) {
+                out.write(buf, 0, n);
+            }
+            background = out.toByteArray();
+        } catch (Exception e) {
+            showDialStatus("Не найден файл фона");
+            return;
+        }
+        pushingDial = true;
+        showDialStatus("Загрузка на часы…");
+        String address = shownDevice.getAddress();
+        byte[] payload = background;
+        new Thread(() -> {
+            String result;
+            try {
+                SifliFilePush push = new SifliFilePush(this, address,
+                        percent -> runOnUiThread(() -> showDialStatus("Загрузка на часы: " + percent + "%")));
+                push.pushWithStyle(
+                        Collections.singletonList(new SifliFilePush.Entry("/dyn/resource/clock_bg.bin", payload)),
+                        SifliFilePush.TYPE_CUSTOM,
+                        SifliFilePush.styleCommand(0xE8, 0xE9, 0xE6, 0, 2));
+                result = "Фон установлен. Выбери на часах пользовательский циферблат.";
+            } catch (Exception e) {
+                result = "Не удалось: " + e.getMessage();
+            }
+            String shown = result;
+            runOnUiThread(() -> {
+                pushingDial = false;
+                showDialStatus(shown);
+            });
+        }).start();
+    }
+
+    private void showDialStatus(String text) {
+        dialStatus.setVisibility(View.VISIBLE);
+        dialStatus.setText(text);
     }
 
     private void setFinding(boolean on) {
