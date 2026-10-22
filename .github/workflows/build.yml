@@ -35,6 +35,10 @@ jobs:
       - name: Apply Monolith branding and patches
         run: scripts/apply-branding.sh upstream
 
+      # Same debug key on every run, so a new build installs over the previous one.
+      - name: Use the shared debug key
+        run: mkdir -p ~/.android && cp keystore/monolith-debug.keystore ~/.android/debug.keystore
+
       - name: Build debug APK
         working-directory: upstream
         run: ./gradlew --no-daemon assembleMainlineDebug

@@ -21,6 +21,15 @@ grep -q 'name="app_name"' "$strings_file" \
   || { echo "app_name not found in $strings_file" >&2; exit 1; }
 sed -i "s|<string translatable=\"false\" name=\"app_name\">[^<]*</string>|<string translatable=\"false\" name=\"app_name\">$APP_NAME</string>|" "$strings_file"
 
+# Fixed content-provider authorities clash with an installed stock Gadgetbridge
+# ("conflicts with another package"), so move the Pebble one under our id.
+grep -q 'name="pebble_content_provider"' "$strings_file" \
+  || { echo "pebble_content_provider not found in $strings_file" >&2; exit 1; }
+sed -i "s|<string translatable=\"false\" name=\"pebble_content_provider\">[^<]*</string>|<string translatable=\"false\" name=\"pebble_content_provider\">$APP_ID.pebble_provider</string>|" "$strings_file"
+if grep -n 'android:authorities="[a-z]' "$GB_DIR/app/src/main/AndroidManifest.xml"; then
+  echo "warning: hard-coded provider authorities above may clash with stock Gadgetbridge" >&2
+fi
+
 # Our own screens and resources.
 python3 "$REPO_DIR/scripts/apply-overlay.py" "$GB_DIR"
 
