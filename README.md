@@ -24,6 +24,9 @@ cd upstream && ./gradlew assembleMainlineDebug
 - `scripts/apply-branding.sh` меняет название и `applicationId`, затем накладывает патчи.
 - `patches/*.patch` наши изменения поверх Gadgetbridge, по порядку имён.
 - `.github/workflows/build.yml` сборка APK в облаке.
+- `docs/watchface-format.md` как Wearfit Pro грузит циферблаты и картинки на часы SiFli.
+- `scripts/make-clock-bg.sh` PNG → eZIP `.bin`, формат картинок часов.
+- `dial/monolith/` фон Monolith: исходный PNG, `clock_bg.bin` и готовый `clock_bg.zip` для загрузки.
 
 ## Лицензия
 
