@@ -21,7 +21,31 @@ grep -q 'name="app_name"' "$strings_file" \
   || { echo "app_name not found in $strings_file" >&2; exit 1; }
 sed -i "s|<string translatable=\"false\" name=\"app_name\">[^<]*</string>|<string translatable=\"false\" name=\"app_name\">$APP_NAME</string>|" "$strings_file"
 
-# Our own changes, applied in name order.
+# Fixed content-provider authorities clash with an installed stock Gadgetbridge
+# ("conflicts with another package"), so move the Pebble one under our id.
+grep -q 'name="pebble_content_provider"' "$strings_file" \
+  || { echo "pebble_content_provider not found in $strings_file" >&2; exit 1; }
+sed -i "s|<string translatable=\"false\" name=\"pebble_content_provider\">[^<]*</string>|<string translatable=\"false\" name=\"pebble_content_provider\">$APP_ID.pebble_provider</string>|" "$strings_file"
+if grep -n 'android:authorities="[a-z]' "$GB_DIR/app/src/main/AndroidManifest.xml"; then
+  echo "warning: hard-coded provider authorities above may clash with stock Gadgetbridge" >&2
+fi
+
+# Our own screens and resources.
+python3 "$REPO_DIR/scripts/apply-overlay.py" "$GB_DIR"
+
+# Build tag on the dashboard header, so a screenshot tells which build is installed.
+build_tag="v0.2 · $(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo dev)"
+cat > "$GB_DIR/app/src/main/res/values/monolith_build.xml" <<EOF
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="monolith_build" translatable="false">$build_tag</string>
+</resources>
+EOF
+
+# Monolith name, palette and mark on every upstream screen.
+python3 "$REPO_DIR/scripts/apply-theme.py" "$GB_DIR"
+
+# Our own changes to upstream code, applied in name order.
 shopt -s nullglob
 for patch in "$REPO_DIR"/patches/*.patch; do
   echo "Applying $(basename "$patch")"

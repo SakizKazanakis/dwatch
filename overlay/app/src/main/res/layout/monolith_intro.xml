@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/monolith_ink"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:id="@+id/monolith_intro_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingTop="36dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="28dp">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="33dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/monolith_logo" />
+
+        <TextView
+            style="@style/MonolithEyebrow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="Подготовка · 01" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:fontFamily="@font/michroma"
+            android:letterSpacing="0.04"
+            android:lineSpacingExtra="6dp"
+            android:text="Связь с часами"
+            android:textColor="@color/monolith_bone"
+            android:textSize="24sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="24dp"
+            android:fontFamily="@font/plex_sans"
+            android:text="Включи доступы один раз. Каждый пункт открывает нужный запрос Android."
+            android:textColor="@color/monolith_steel"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:id="@+id/monolith_intro_rows"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <Button
+            android:id="@+id/monolith_intro_continue"
+            style="@style/MonolithAction"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="18dp"
+            android:layout_weight="0"
+            android:background="@drawable/monolith_cell_solid"
+            android:text="Продолжить"
+            android:textColor="@color/monolith_ink" />
+    </LinearLayout>
+</ScrollView>

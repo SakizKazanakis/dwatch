@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@android:id/background">
+        <shape><solid android:color="@color/monolith_seam" /></shape>
+    </item>
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape>
+                <gradient android:angle="0" android:startColor="@color/monolith_signal_dim" android:endColor="@color/monolith_signal" />
+            </shape>
+        </clip>
+    </item>
+</layer-list>

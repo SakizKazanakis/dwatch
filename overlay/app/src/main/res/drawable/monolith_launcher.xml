@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-Android 8 launcher icon: platinum DKRNN mark on ink. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#FF0D0F11" android:pathData="M0 0 H108 V108 H0 Z" />
+    <group android:scaleX="0.3" android:scaleY="0.3" android:translateX="24" android:translateY="10.8">
+        <path android:pathData="M21 22 L79 76 L79 179 L90 189 L90 266 L82 266 L21 200 Z" android:fillColor="#FFD9DCDB" />
+        <path android:pathData="M179 22 L121 76 L121 179 L110 189 L110 266 L118 266 L179 200 Z" android:fillColor="#FFD9DCDB" />
+    </group>
+</vector>
