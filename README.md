@@ -22,9 +22,14 @@ cd upstream && ./gradlew assembleMainlineDebug
 ## Устройство репозитория
 
 - `scripts/apply-branding.sh` меняет название и `applicationId`, затем накладывает патчи.
-- `patches/*.patch` наши изменения поверх Gadgetbridge, по порядку имён.
+- `overlay/` наши новые файлы: экран «Пульт» (`MonolithActivity`), ресурсы, шрифты. Копируются в Gadgetbridge, `MonolithActivity` становится стартовым экраном.
+- `scripts/apply-overlay.py` копирует overlay и правит манифест.
+- `patches/*.patch` наши изменения в коде Gadgetbridge, по порядку имён.
 - `.github/workflows/build.yml` сборка APK в облаке.
 
 ## Лицензия
+
+Шрифты Michroma, IBM Plex Mono и IBM Plex Sans распространяются под SIL OFL 1.1, тексты лицензий в `third_party/fonts/`.
+
 
 Gadgetbridge распространяется под AGPL-3.0, поэтому Monolith тоже AGPL-3.0, а исходники открыты.

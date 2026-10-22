@@ -21,7 +21,10 @@ grep -q 'name="app_name"' "$strings_file" \
   || { echo "app_name not found in $strings_file" >&2; exit 1; }
 sed -i "s|<string translatable=\"false\" name=\"app_name\">[^<]*</string>|<string translatable=\"false\" name=\"app_name\">$APP_NAME</string>|" "$strings_file"
 
-# Our own changes, applied in name order.
+# Our own screens and resources.
+python3 "$REPO_DIR/scripts/apply-overlay.py" "$GB_DIR"
+
+# Our own changes to upstream code, applied in name order.
 shopt -s nullglob
 for patch in "$REPO_DIR"/patches/*.patch; do
   echo "Applying $(basename "$patch")"
