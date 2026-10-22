@@ -32,7 +32,7 @@ import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.text.NumberFormat;
 import java.util.Calendar;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -198,28 +198,28 @@ public class MonolithActivity extends AppCompatActivity {
             return;
         }
         byte[] background;
-        try (InputStream in = getAssets().open("monolith/clock_bg.bin")) {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            for (int n; (n = in.read(buf)) > 0; ) {
-                out.write(buf, 0, n);
-            }
-            background = out.toByteArray();
+        byte[] thumbnail;
+        try {
+            background = readAsset("monolith/clock_bg.bin");
+            thumbnail = readAsset("monolith/clock_bg_thum.bin");
         } catch (Exception e) {
             showDialStatus("Не найден файл фона");
             return;
         }
+        byte[] bg = background;
+        byte[] thumb = thumbnail;
         pushingDial = true;
         showDialStatus("Загрузка на часы…");
         String address = shownDevice.getAddress();
-        byte[] payload = background;
         new Thread(() -> {
             String result;
             try {
                 SifliFilePush push = new SifliFilePush(this, address,
                         percent -> runOnUiThread(() -> showDialStatus("Загрузка на часы: " + percent + "%")));
                 push.pushWithStyle(
-                        Collections.singletonList(new SifliFilePush.Entry("/dyn/resource/clock_bg.bin", payload)),
+                        Arrays.asList(
+                                new SifliFilePush.Entry("/dyn/resource/clock_bg.bin", bg),
+                                new SifliFilePush.Entry("/dyn/resource/clock_bg_thum.bin", thumb)),
                         SifliFilePush.TYPE_CUSTOM,
                         SifliFilePush.styleCommand(0xE8, 0xE9, 0xE6, 0, 2));
                 result = "Фон установлен. Выбери на часах пользовательский циферблат.";
@@ -233,6 +233,17 @@ public class MonolithActivity extends AppCompatActivity {
                 showDialStatus(shown);
             });
         }).start();
+    }
+
+    private byte[] readAsset(String name) throws Exception {
+        try (InputStream in = getAssets().open(name)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            for (int n; (n = in.read(buf)) > 0; ) {
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        }
     }
 
     private void showDialStatus(String text) {

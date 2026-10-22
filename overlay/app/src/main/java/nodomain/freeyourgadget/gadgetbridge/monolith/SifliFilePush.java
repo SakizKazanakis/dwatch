@@ -106,7 +106,19 @@ public class SifliFilePush {
         return new byte[]{(byte) 0xEA, 0, 9, 0, 13, 1, (byte) r, (byte) g, (byte) b, (byte) font, (byte) location, (byte) 0xFF};
     }
 
-    /** Pushes files and then sends {@code style} on the Wearfit write characteristic, if the watch has it. */
+    /**
+     * Wearfit's "custom dial" handshake on its main channel (TransferOrder.startSendPic with
+     * everything zero but the state): 0 before the upload, 1 after success, 2 after failure.
+     * The watch only lists the new background as a dial after state 1 and the style.
+     */
+    private static byte[] dialTransferState(int state) {
+        return new byte[]{(byte) 0xAD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (byte) state};
+    }
+
+    /**
+     * Pushes files as a custom dial: announces the transfer, uploads, then confirms it and sends
+     * {@code style} on the Wearfit write characteristic, as Wearfit Pro does.
+     */
     public void pushWithStyle(List<Entry> files, int type, byte[] style) throws Exception {
         List<byte[]> payloads = new ArrayList<>();
         long total = 0;
@@ -117,9 +129,28 @@ public class SifliFilePush {
         }
         try {
             connect();
-            run(files, payloads, type, total);
-            if (style != null && wearfitWrite != null) {
-                write(wearfitWrite, style, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
+            if (style != null) {
+                if (wearfitWrite == null) {
+                    throw new Exception("на часах нет командного канала Wearfit");
+                }
+                command(dialTransferState(0));
+            }
+            try {
+                run(files, payloads, type, total);
+            } catch (Exception e) {
+                if (style != null) {
+                    try {
+                        command(dialTransferState(2));
+                    } catch (Exception ignored) {
+                        // Already failing; the watch drops the transfer on its own.
+                    }
+                }
+                throw e;
+            }
+            if (style != null) {
+                command(dialTransferState(1));
+                Thread.sleep(300);
+                command(style);
             }
         } finally {
             close();
@@ -315,6 +346,12 @@ public class SifliFilePush {
             gatt.close();
             gatt = null;
         }
+    }
+
+    /** A command on the Wearfit main channel, with a response when the characteristic offers one. */
+    private void command(byte[] value) throws Exception {
+        boolean acked = (wearfitWrite.getProperties() & BluetoothGattCharacteristic.PROPERTY_WRITE) != 0;
+        write(wearfitWrite, value, acked ? BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT : BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
     }
 
     private void write(BluetoothGattCharacteristic c, byte[] value, int writeType) throws Exception {
