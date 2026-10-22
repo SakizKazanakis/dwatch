@@ -1,15 +1,15 @@
-# Dwatch
+# Monolith
 
 Своё приложение-компаньон для часов HK8 Pro Max вместо Wearfit Pro.
 
 Основа: [Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge), открытое приложение,
-которое уже поддерживает часы семейства Wearfit (HK8 Ultra). Dwatch собирается из исходников
+которое уже поддерживает часы семейства Wearfit (HK8 Ultra). Monolith собирается из исходников
 Gadgetbridge с нашим названием, своим `applicationId` и нашими изменениями из `patches/`.
 
 ## Как собрать
 
 Ничего ставить не нужно: GitHub Actions собирает APK на каждый push в `main`.
-Готовый файл лежит во вкладке **Actions → последний запуск → Artifacts → dwatch-debug-apk**.
+Готовый файл лежит во вкладке **Actions → последний запуск → Artifacts → monolith-debug-apk**.
 
 Локально (нужны JDK 21 и Android SDK):
 
@@ -27,4 +27,4 @@ cd upstream && ./gradlew assembleMainlineDebug
 
 ## Лицензия
 
-Gadgetbridge распространяется под AGPL-3.0, поэтому Dwatch тоже AGPL-3.0, а исходники открыты.
+Gadgetbridge распространяется под AGPL-3.0, поэтому Monolith тоже AGPL-3.0, а исходники открыты.
