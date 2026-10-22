@@ -137,6 +137,7 @@ def mark_vector(width, height, fill, alpha="1"):
 def rename_strings(gb):
     # A \n escape right before the name still counts as a word break.
     word = re.compile(r"(?:(?<=\\n)|(?<![A-Za-z0-9_./:@-]))Gadgetbridge(?![A-Za-z0-9_])")
+    cyrillic = re.compile(r"[Гг]аджетбридж[а-яё]*")
     files = glob.glob(os.path.join(gb, "app/src/*/res/values*/strings.xml"))
     if not files:
         fail("no strings.xml found")
@@ -145,8 +146,10 @@ def rename_strings(gb):
         text = read(path)
         # Only element text: attributes such as name="..." stay as they are.
         new, n = re.subn(r">([^<]*)<", lambda m: ">" + word.sub("Monolith", m.group(1)) + "<", text)
+        # Russian translations decline the name in Cyrillic ("в Гаджетбридже").
+        new = cyrillic.sub("Monolith", new)
         if n and new != text:
-            total += len(word.findall(text))
+            total += len(word.findall(text)) + len(cyrillic.findall(text))
             write(path, new)
     print(f"apply-theme: renamed {total} mentions in {len(files)} string files")
 

@@ -12,7 +12,9 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.os.BatteryManager;
 import android.os.Bundle;
+import android.util.TypedValue;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -22,6 +24,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.widget.TextViewCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import java.io.ByteArrayOutputStream;
@@ -37,8 +40,6 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.ControlCenterv2;
 import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils;
-import nodomain.freeyourgadget.gadgetbridge.activities.PermissionsActivity;
-import nodomain.freeyourgadget.gadgetbridge.activities.welcome.WelcomeActivity;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceManager;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
@@ -46,11 +47,10 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.DailyTotals;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
-import nodomain.freeyourgadget.gadgetbridge.util.PermissionsUtils;
-import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 /** Monolith dashboard ("Пульт"): link state, both batteries, pulse, steps, air temperature, coordinates, quick actions. */
 public class MonolithActivity extends AppCompatActivity {
+    static final String EXTRA_NO_LAUNCH = "monolith_no_launch";
     private static final int REQUEST_LOCATION = 41;
 
     private PulseWireView wire;
@@ -71,6 +71,7 @@ public class MonolithActivity extends AppCompatActivity {
     private Button find;
     private TextView dialStatus;
     private boolean pushingDial;
+    private Location lastLocation;
 
     private final BroadcastReceiver deviceReceiver = new BroadcastReceiver() {
         @Override
@@ -91,6 +92,11 @@ public class MonolithActivity extends AppCompatActivity {
         setTheme(R.style.MonolithTheme);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.monolith_activity);
+        if (savedInstanceState == null && GBApplication.getPrefs().getBoolean("first_run", true)) {
+            startActivity(new Intent(this, MonolithIntroActivity.class));
+            finish();
+            return;
+        }
 
         wire = findViewById(R.id.monolith_wire);
         linkState = findViewById(R.id.monolith_link_state);
@@ -105,6 +111,10 @@ public class MonolithActivity extends AppCompatActivity {
         steps = findViewById(R.id.monolith_steps);
         temperature = findViewById(R.id.monolith_temperature);
         coords = findViewById(R.id.monolith_coords);
+        for (TextView number : new TextView[]{heartRate, steps, temperature}) {
+            number.setMaxLines(1);
+            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(number, 12, 26, 1, TypedValue.COMPLEX_UNIT_SP);
+        }
 
         TextView wordmark = findViewById(R.id.monolith_wordmark);
         wordmark.post(() -> wordmark.getPaint().setShader(new LinearGradient(0, 0, wordmark.getWidth(), 0,
@@ -128,19 +138,36 @@ public class MonolithActivity extends AppCompatActivity {
         dialStatus = findViewById(R.id.monolith_dial_status);
         findViewById(R.id.monolith_dial_bg).setOnClickListener(v -> pushDialBackground());
 
-        if (savedInstanceState == null) {
-            routeOnboarding();
+        deviceName.setOnClickListener(v -> {
+            Intent discovery = discoveryIntent(this);
+            if (shownDevice == null && discovery != null) {
+                startActivity(discovery);
+            }
+        });
+
+        if (savedInstanceState == null && !getIntent().getBooleanExtra(EXTRA_NO_LAUNCH, false)) {
+            ViewGroup root = (ViewGroup) ((ViewGroup) findViewById(android.R.id.content)).getChildAt(0);
+            root.setVisibility(View.INVISIBLE);
+            MonolithLaunch.play(this, () -> {
+                root.setVisibility(View.VISIBLE);
+                MonolithLaunch.reveal(root);
+            });
         }
     }
 
-    // Same dispatch as ControlCenterv2: welcome flow on first run, permissions afterwards.
-    private void routeOnboarding() {
-        Prefs prefs = GBApplication.getPrefs();
-        if (prefs.getBoolean("first_run", true)) {
-            startActivity(new Intent(this, WelcomeActivity.class));
-        } else if (prefs.getBoolean("permission_pestering", true) && !PermissionsUtils.checkAllPermissions(this)) {
-            startActivity(new Intent(this, PermissionsActivity.class));
+    /** Upstream's watch search screen; its class has moved between releases. */
+    static Intent discoveryIntent(Context context) {
+        for (String name : new String[]{
+                "nodomain.freeyourgadget.gadgetbridge.activities.discovery.DiscoveryActivityV2",
+                "nodomain.freeyourgadget.gadgetbridge.activities.DiscoveryActivityV2",
+                "nodomain.freeyourgadget.gadgetbridge.activities.DiscoveryActivity"}) {
+            try {
+                return new Intent(context, Class.forName(name));
+            } catch (ClassNotFoundException e) {
+                // Try the next known location.
+            }
         }
+        return null;
     }
 
     /** Uploads the bundled Monolith background as the watch's custom dial and sets the clock style. */
@@ -179,7 +206,8 @@ public class MonolithActivity extends AppCompatActivity {
                         SifliFilePush.styleCommand(0xE8, 0xE9, 0xE6, 0, 2));
                 result = "Фон установлен. Выбери на часах пользовательский циферблат.";
             } catch (Exception e) {
-                result = "Не удалось: " + e.getMessage();
+                android.util.Log.w("Monolith", "dial background push failed", e);
+                result = "Не удалось: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
             }
             String shown = result;
             runOnUiThread(() -> {
@@ -211,8 +239,8 @@ public class MonolithActivity extends AppCompatActivity {
         LocalBroadcastManager.getInstance(this).registerReceiver(deviceReceiver, filter);
         showPhoneBattery(registerReceiver(phoneBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED)));
         refreshDevice();
-        refreshTemperature();
         refreshLocation();
+        refreshTemperature();
     }
 
     @Override
@@ -241,7 +269,7 @@ public class MonolithActivity extends AppCompatActivity {
         shownDevice = device;
 
         if (device == null) {
-            deviceName.setText("Часы не добавлены");
+            deviceName.setText("Добавить часы →");
             deviceAddress.setText("");
             setLink(false, "Нет устройства");
             watchBattery.setText("—");
@@ -309,12 +337,29 @@ public class MonolithActivity extends AppCompatActivity {
      * Read reflectively: upstream keeps moving the Weather holder and WeatherSpec accessors.
      */
     private void refreshTemperature() {
+        MonolithWeather.Reading cached = MonolithWeather.cached(this);
         Integer kelvin = currentTempKelvin();
-        if (kelvin == null) {
+        if (cached != null) {
+            showCelsius(Math.round(cached.celsius));
+        } else if (kelvin != null) {
+            showCelsius(kelvin - 273);
+        } else {
             temperature.setText("—");
-            return;
         }
-        int celsius = kelvin - 273;
+        if (lastLocation != null && MonolithWeather.stale(this)) {
+            double lat = lastLocation.getLatitude();
+            double lon = lastLocation.getLongitude();
+            new Thread(() -> {
+                MonolithWeather.Reading fresh = MonolithWeather.fetch(this, lat, lon);
+                if (fresh != null) {
+                    runOnUiThread(() -> showCelsius(Math.round(fresh.celsius)));
+                    MonolithWeather.sendToWatch(fresh);
+                }
+            }).start();
+        }
+    }
+
+    private void showCelsius(long celsius) {
         temperature.setText((celsius > 0 ? "+" : "") + celsius + "°");
     }
 
@@ -389,6 +434,7 @@ public class MonolithActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_LOCATION) {
             refreshLocation();
+            refreshTemperature();
         }
     }
 
@@ -410,6 +456,7 @@ public class MonolithActivity extends AppCompatActivity {
             coords.setText("Нет данных о местоположении");
             return;
         }
+        lastLocation = best;
         coords.setText(String.format(Locale.US, "LAT  %.4f° %s\nLON  %.4f° %s",
                 Math.abs(best.getLatitude()), best.getLatitude() >= 0 ? "N" : "S",
                 Math.abs(best.getLongitude()), best.getLongitude() >= 0 ? "E" : "W"));

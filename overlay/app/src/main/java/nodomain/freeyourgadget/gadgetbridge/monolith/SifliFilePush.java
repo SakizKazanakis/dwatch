@@ -169,6 +169,7 @@ public class SifliFilePush {
             check(await(CMD_FILE_START + 1), "файл");
 
             int count = (data.length + partLen - 1) / partLen;
+            int retries = 0;
             for (int i = 0; i < count; i++) {
                 int off = i * partLen;
                 int len = Math.min(partLen, data.length - off);
@@ -176,15 +177,25 @@ public class SifliFilePush {
                 part.putShort((short) CMD_FILE_DATA).putShort((short) (len + 4)).putInt(i + 1).put(data, off, len);
                 send(part.array());
                 byte[] dataRsp = await(CMD_FILE_DATA + 1);
-                int result = s16(dataRsp, 2);
+                int result = dataRsp.length >= 4 ? s16(dataRsp, 2) : -1;
                 if (result == 4 || result == 7) {
-                    // Watch asks to continue from its expected (1-based) index.
-                    i = i32(dataRsp, 4) - 2;
+                    if (++retries > 5) {
+                        throw new Exception("часы не принимают данные (" + result + ")");
+                    }
+                    if (dataRsp.length >= 8) {
+                        // Watch asks to continue from its expected (1-based) index.
+                        i = Math.max(0, i32(dataRsp, 4) - 1) - 1;
+                    } else {
+                        // Busy: send the same part again a moment later.
+                        Thread.sleep(300);
+                        i--;
+                    }
                     continue;
                 }
                 if (result != 0) {
                     throw new Exception("часы отклонили данные (" + result + ")");
                 }
+                retries = 0;
                 if (listener != null) {
                     listener.onProgress((int) ((sent + off + len) * 100 / total));
                 }
@@ -209,7 +220,10 @@ public class SifliFilePush {
         @Override
         public void onConnectionStateChange(BluetoothGatt g, int status, int newState) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                g.requestMtu(247);
+                // The link is usually already up (Gadgetbridge holds it); some stacks refuse a second MTU request.
+                if (!g.requestMtu(247)) {
+                    g.discoverServices();
+                }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 events.add(new Exception("связь с часами потеряна"));
                 synchronized (writeLock) {
@@ -280,7 +294,12 @@ public class SifliFilePush {
         }
         BluetoothDevice device = adapter.getRemoteDevice(address);
         gatt = device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE);
-        Object event = events.poll(40, TimeUnit.SECONDS);
+        Object event = events.poll(6, TimeUnit.SECONDS);
+        if (event == null && gatt != null) {
+            // No MTU answer: go on with the default packet size.
+            gatt.discoverServices();
+            event = events.poll(30, TimeUnit.SECONDS);
+        }
         if (event == null) {
             throw new Exception("часы не ответили");
         }
@@ -291,7 +310,7 @@ public class SifliFilePush {
 
     private void close() {
         if (gatt != null) {
-            gatt.disconnect();
+            // Only drop our client; disconnect() could take Gadgetbridge's link down with it.
             gatt.close();
             gatt = null;
         }

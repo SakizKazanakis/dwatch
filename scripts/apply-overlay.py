@@ -21,6 +21,14 @@ ACTIVITY = """        <activity
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name="nodomain.freeyourgadget.gadgetbridge.monolith.MonolithIntroActivity"
+            android:theme="@style/MonolithTheme"
+            android:exported="false" />
+"""
+
+# Weather for the dashboard and the watch comes from Open-Meteo.
+PERMISSIONS = """    <uses-permission android:name="android.permission.INTERNET" />
 """
 
 
@@ -55,6 +63,9 @@ def main() -> None:
         text = text.replace(app_tag.group(0), tag, 1)
     else:
         print("warning: <application> not found, upstream icon kept", file=sys.stderr)
+
+    if 'android.permission.INTERNET" />' not in re.sub(r"<!--.*?-->", "", text, flags=re.S):
+        text = re.sub(r"(<manifest\b[^>]*>)", lambda m: m.group(1) + "\n" + PERMISSIONS, text, count=1)
 
     if "</application>" not in text:
         sys.exit("</application> not found in manifest")
