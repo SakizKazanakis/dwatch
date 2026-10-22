@@ -36,6 +36,7 @@ import nodomain.freeyourgadget.gadgetbridge.R;
  * needs. Replaces the upstream welcome pages and permission list.
  */
 public class MonolithIntroActivity extends AppCompatActivity {
+    static final String PREF_DONE = "monolith_intro_done";
     private static final String PREF_ASKED_LISTENER = "monolith_asked_listener";
 
     private LinearLayout rows;
@@ -235,6 +236,7 @@ public class MonolithIntroActivity extends AppCompatActivity {
 
     private void finishIntro() {
         GBApplication.getPrefs().getPreferences().edit()
+                .putBoolean(PREF_DONE, true)
                 .putBoolean("first_run", false)
                 .putBoolean("permission_pestering", false)
                 .apply();

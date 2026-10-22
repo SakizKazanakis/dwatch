@@ -92,7 +92,7 @@ public class MonolithActivity extends AppCompatActivity {
         setTheme(R.style.MonolithTheme);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.monolith_activity);
-        if (savedInstanceState == null && GBApplication.getPrefs().getBoolean("first_run", true)) {
+        if (savedInstanceState == null && !GBApplication.getPrefs().getBoolean(MonolithIntroActivity.PREF_DONE, false)) {
             startActivity(new Intent(this, MonolithIntroActivity.class));
             finish();
             return;
