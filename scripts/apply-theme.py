@@ -94,6 +94,10 @@ def fail(msg):
     sys.exit(f"apply-theme: {msg}")
 
 
+def warn(msg):
+    print(f"apply-theme: warning: {msg}")
+
+
 def read(path):
     with open(path, encoding="utf-8") as f:
         return f.read()
@@ -104,10 +108,11 @@ def write(path, text):
         f.write(text)
 
 
-def replace_once(path, old, new):
+def replace_once(path, old, new, required=True):
     text = read(path)
     if old not in text:
-        fail(f"{old!r} not found in {path}")
+        (fail if required else warn)(f"{old!r} not found in {path}")
+        return
     write(path, text.replace(old, new, 1))
 
 
@@ -189,16 +194,25 @@ def restyle(gb):
         "android:windowBackground": "#FF000000",
         "android:navigationBarColor": "#FF000000",
     })
-    # Splash and any screen that skips the theme switch also start dark.
-    text, n = re.subn(r'(<style name="SplashTheme" parent=")GadgetbridgeTheme\.NoActionBar"',
-                      r'\1GadgetbridgeThemeDark.NoActionBar"', text)
-    if n != 1:
-        fail("SplashTheme parent not found")
     write(path, text)
+
+    # Splash and any screen that skips the theme switch also start dark.
+    splash = 0
+    for other in glob.glob(os.path.join(gb, "app/src/main/res/values*/*.xml")):
+        text = read(other)
+        new, n = re.subn(r'(<style name="SplashTheme" parent=")[^"]*"',
+                         r'\1GadgetbridgeThemeDark.NoActionBar"', text)
+        new, m = re.subn(r'(<item name="(?:android:)?windowSplashScreenBackground"[^>]*>)[^<]*(</item>)',
+                         lambda mm: mm.group(1) + INK + mm.group(2), new)
+        if new != text:
+            write(other, new)
+        splash += n + m
+    if not splash:
+        warn("SplashTheme not found")
 
     manifest = os.path.join(gb, "app/src/main/AndroidManifest.xml")
     replace_once(manifest, 'android:theme="@style/GadgetbridgeTheme"',
-                 'android:theme="@style/GadgetbridgeThemeDark"')
+                 'android:theme="@style/GadgetbridgeThemeDark"', required=False)
 
     # Monolith is always dark: ignore the light, system and dynamic choices.
     app = os.path.join(gb, "app/src/main/java/nodomain/freeyourgadget/gadgetbridge/GBApplication.java")
@@ -228,9 +242,11 @@ def relogo(gb):
 
     # Welcome screen: mark on ink instead of the blue tile, and no theme picker.
     intro = os.path.join(res, "layout/fragment_welcome_intro.xml")
-    replace_once(intro, 'android:background="@color/accent"', 'android:background="@color/monolith_ink"')
+    replace_once(intro, 'android:background="@color/accent"', 'android:background="@color/monolith_ink"',
+                 required=False)
     replace_once(intro, 'android:id="@+id/app_theme_dropdown_input"',
-                 'android:id="@+id/app_theme_dropdown_input"\n            android:visibility="gone"')
+                 'android:id="@+id/app_theme_dropdown_input"\n            android:visibility="gone"',
+                 required=False)
 
     # Status bar icons: the mark instead of the Gadgetbridge silhouette.
     names = set()
