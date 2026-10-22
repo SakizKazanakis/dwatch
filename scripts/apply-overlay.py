@@ -11,6 +11,8 @@ from pathlib import Path
 ACTIVITY = """        <activity
             android:name="nodomain.freeyourgadget.gadgetbridge.monolith.MonolithActivity"
             android:label="@string/app_name"
+            android:icon="@drawable/monolith_launcher"
+            android:roundIcon="@drawable/monolith_launcher"
             android:theme="@style/MonolithTheme"
             android:launchMode="singleTop"
             android:exported="true">
@@ -45,6 +47,14 @@ def main() -> None:
         text = text.replace(block, stripped)
     else:
         print("warning: ControlCenterv2 not found, upstream launcher kept", file=sys.stderr)
+
+    # Our icon for the app as a whole (app info, recents), not only the launcher entry.
+    app_tag = re.search(r"<application\s[^>]*>", text)
+    if app_tag:
+        tag = re.sub(r'"@mipmap/ic_launcher(?:_round)?"', '"@drawable/monolith_launcher"', app_tag.group(0))
+        text = text.replace(app_tag.group(0), tag, 1)
+    else:
+        print("warning: <application> not found, upstream icon kept", file=sys.stderr)
 
     if "</application>" not in text:
         sys.exit("</application> not found in manifest")
