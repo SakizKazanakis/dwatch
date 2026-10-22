@@ -33,6 +33,9 @@ fi
 # Our own screens and resources.
 python3 "$REPO_DIR/scripts/apply-overlay.py" "$GB_DIR"
 
+# Monolith name, palette and mark on every upstream screen.
+python3 "$REPO_DIR/scripts/apply-theme.py" "$GB_DIR"
+
 # Our own changes to upstream code, applied in name order.
 shopt -s nullglob
 for patch in "$REPO_DIR"/patches/*.patch; do
