@@ -24,6 +24,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import java.lang.reflect.Field;
 import java.text.NumberFormat;
 import java.util.Calendar;
 import java.util.List;
@@ -42,8 +43,6 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.DailyTotals;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
-import nodomain.freeyourgadget.gadgetbridge.model.Weather;
-import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec;
 import nodomain.freeyourgadget.gadgetbridge.util.PermissionsUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
@@ -247,15 +246,48 @@ public class MonolithActivity extends AppCompatActivity {
         return "—";
     }
 
-    /** Current air temperature from the weather Gadgetbridge last received (stored in kelvin). */
+    /**
+     * Current air temperature from the weather Gadgetbridge last received (stored in kelvin).
+     * Read reflectively: upstream keeps moving the Weather holder and WeatherSpec accessors.
+     */
     private void refreshTemperature() {
-        WeatherSpec spec = Weather.getInstance().getWeatherSpec();
-        if (spec == null) {
+        Integer kelvin = currentTempKelvin();
+        if (kelvin == null) {
             temperature.setText("—");
             return;
         }
-        int celsius = spec.currentTemp - 273;
+        int celsius = kelvin - 273;
         temperature.setText((celsius > 0 ? "+" : "") + celsius + "°");
+    }
+
+    private static Integer currentTempKelvin() {
+        for (String name : new String[]{
+                "nodomain.freeyourgadget.gadgetbridge.model.weather.Weather",
+                "nodomain.freeyourgadget.gadgetbridge.model.Weather"}) {
+            try {
+                Class<?> holder = Class.forName(name);
+                Object instance;
+                try {
+                    instance = holder.getMethod("getInstance").invoke(null);
+                } catch (NoSuchMethodException e) {
+                    instance = holder.getField("INSTANCE").get(null);
+                }
+                Object spec = holder.getMethod("getWeatherSpec").invoke(instance);
+                if (spec == null) {
+                    return null;
+                }
+                try {
+                    return ((Number) spec.getClass().getMethod("getCurrentTemp").invoke(spec)).intValue();
+                } catch (NoSuchMethodException e) {
+                    Field field = spec.getClass().getDeclaredField("currentTemp");
+                    field.setAccessible(true);
+                    return ((Number) field.get(spec)).intValue();
+                }
+            } catch (Exception e) {
+                // Try the next known location.
+            }
+        }
+        return null;
     }
 
     private void setLink(boolean connected, String label) {
