@@ -46,6 +46,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.DailyTotals;
+import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
 
 /** Monolith dashboard ("Пульт"): link state, both batteries, pulse, steps, air temperature, coordinates, quick actions. */
@@ -72,6 +73,21 @@ public class MonolithActivity extends AppCompatActivity {
     private TextView dialStatus;
     private boolean pushingDial;
     private Location lastLocation;
+    private TextView weatherNote;
+    private static long lastAutoSync;
+
+    private final BroadcastReceiver realtimeReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Object sample = intent.getSerializableExtra(DeviceService.EXTRA_REALTIME_SAMPLE);
+            if (sample instanceof ActivitySample) {
+                int hr = ((ActivitySample) sample).getHeartRate();
+                if (HeartRateUtils.getInstance().isValidHeartRateValue(hr)) {
+                    heartRate.setText(String.valueOf(hr));
+                }
+            }
+        }
+    };
 
     private final BroadcastReceiver deviceReceiver = new BroadcastReceiver() {
         @Override
@@ -111,6 +127,8 @@ public class MonolithActivity extends AppCompatActivity {
         steps = findViewById(R.id.monolith_steps);
         temperature = findViewById(R.id.monolith_temperature);
         coords = findViewById(R.id.monolith_coords);
+        weatherNote = findViewById(R.id.monolith_weather_note);
+        ((TextView) findViewById(R.id.monolith_version)).setText(getString(R.string.monolith_build));
         for (TextView number : new TextView[]{heartRate, steps, temperature}) {
             number.setMaxLines(1);
             TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(number, 12, 26, 1, TypedValue.COMPLEX_UNIT_SP);
@@ -237,6 +255,7 @@ public class MonolithActivity extends AppCompatActivity {
         filter.addAction(GBDevice.ACTION_DEVICE_CHANGED);
         filter.addAction(DeviceManager.ACTION_DEVICES_CHANGED);
         LocalBroadcastManager.getInstance(this).registerReceiver(deviceReceiver, filter);
+        LocalBroadcastManager.getInstance(this).registerReceiver(realtimeReceiver, new IntentFilter(DeviceService.ACTION_REALTIME_SAMPLES));
         showPhoneBattery(registerReceiver(phoneBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED)));
         refreshDevice();
         refreshLocation();
@@ -249,6 +268,7 @@ public class MonolithActivity extends AppCompatActivity {
             setFinding(false);
         }
         LocalBroadcastManager.getInstance(this).unregisterReceiver(deviceReceiver);
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(realtimeReceiver);
         unregisterReceiver(phoneBatteryReceiver);
         super.onPause();
     }
@@ -277,6 +297,12 @@ public class MonolithActivity extends AppCompatActivity {
             heartRate.setText("—");
             steps.setText("—");
             return;
+        }
+
+        // Pull steps and pulse from the watch when the dashboard opens, at most every 10 minutes.
+        if (device.isInitialized() && System.currentTimeMillis() - lastAutoSync > 10 * 60 * 1000L) {
+            lastAutoSync = System.currentTimeMillis();
+            GBApplication.deviceService(device).onFetchRecordedData(RecordedDataTypes.TYPE_SYNC);
         }
 
         deviceName.setText(device.getAliasOrName());
@@ -310,7 +336,7 @@ public class MonolithActivity extends AppCompatActivity {
         }).start();
     }
 
-    /** Last valid heart-rate value recorded in the past 24 hours, or a dash. */
+    /** Last valid heart-rate value recorded in the past three days, or a dash. */
     private static String latestHeartRate(GBDevice device) {
         int now = (int) (System.currentTimeMillis() / 1000);
         try (DBHandler db = GBApplication.acquireDB()) {
@@ -319,7 +345,7 @@ public class MonolithActivity extends AppCompatActivity {
             if (provider == null) {
                 return "—";
             }
-            List<? extends ActivitySample> samples = provider.getAllActivitySamples(now - 24 * 3600, now);
+            List<? extends ActivitySample> samples = provider.getAllActivitySamples(now - 3 * 24 * 3600, now);
             for (int i = samples.size() - 1; i >= 0; i--) {
                 int hr = samples.get(i).getHeartRate();
                 if (HeartRateUtils.getInstance().isValidHeartRateValue(hr)) {
@@ -349,10 +375,16 @@ public class MonolithActivity extends AppCompatActivity {
         if (lastLocation != null && MonolithWeather.stale(this)) {
             double lat = lastLocation.getLatitude();
             double lon = lastLocation.getLongitude();
+            weatherNote.setText("°C · загрузка");
             new Thread(() -> {
                 MonolithWeather.Reading fresh = MonolithWeather.fetch(this, lat, lon);
+                runOnUiThread(() -> {
+                    weatherNote.setText(fresh != null ? "°C · погода" : "°C · нет сети");
+                    if (fresh != null) {
+                        showCelsius(Math.round(fresh.celsius));
+                    }
+                });
                 if (fresh != null) {
-                    runOnUiThread(() -> showCelsius(Math.round(fresh.celsius)));
                     MonolithWeather.sendToWatch(fresh);
                 }
             }).start();

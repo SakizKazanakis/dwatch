@@ -33,6 +33,15 @@ fi
 # Our own screens and resources.
 python3 "$REPO_DIR/scripts/apply-overlay.py" "$GB_DIR"
 
+# Build tag on the dashboard header, so a screenshot tells which build is installed.
+build_tag="v0.2 · $(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo dev)"
+cat > "$GB_DIR/app/src/main/res/values/monolith_build.xml" <<EOF
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="monolith_build" translatable="false">$build_tag</string>
+</resources>
+EOF
+
 # Monolith name, palette and mark on every upstream screen.
 python3 "$REPO_DIR/scripts/apply-theme.py" "$GB_DIR"
 

@@ -164,7 +164,8 @@ public class SifliFilePush {
             byte[] data = payloads.get(f);
 
             ByteBuffer fileStart = le(10 + name.length);
-            fileStart.putShort((short) CMD_FILE_START).putShort((short) (name.length + 6)).putInt(data.length).putInt(name.length).put(name);
+            // Body: file length (u32), name length (u16), name.
+            fileStart.putShort((short) CMD_FILE_START).putShort((short) (name.length + 6)).putInt(data.length).putShort((short) name.length).put(name);
             send(fileStart.array());
             check(await(CMD_FILE_START + 1), "файл");
 

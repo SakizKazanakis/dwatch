@@ -38,7 +38,8 @@
             style="@style/MonolithEyebrow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="v0.1"
+            android:id="@+id/monolith_version"
+            android:text="v0.2"
             android:textColor="@color/monolith_signal_dim" />
     </LinearLayout>
 
@@ -342,6 +343,7 @@
                         style="@style/MonolithEyebrow"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:id="@+id/monolith_weather_note"
                         android:layout_marginTop="4dp"
                         android:text="°C · погода"
                         android:textColor="@color/monolith_signal_dim" />
