@@ -17,6 +17,8 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -41,3 +43,16 @@ jobs:
         with:
           name: monolith-debug-apk
           path: upstream/app/build/outputs/apk/mainline/debug/*.apk
+
+      # Pushes to main and manual runs refresh one fixed release, so the phone
+      # always has the same direct download link.
+      - name: Publish to the "latest" release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp upstream/app/build/outputs/apk/mainline/debug/*.apk monolith.apk
+          gh release view latest -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create latest -R "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" \
+              --title "Monolith (последняя сборка)" --notes "Отладочная сборка Monolith. Скачай monolith.apk на телефон и установи."
+          gh release upload latest monolith.apk -R "$GITHUB_REPOSITORY" --clobber
