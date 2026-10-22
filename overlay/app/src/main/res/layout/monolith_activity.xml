@@ -238,26 +238,114 @@
                 android:layout_height="1dp"
                 android:background="@color/monolith_seam" />
 
-            <!-- Steps -->
+            <!-- Pulse, steps, air temperature -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="24dp">
+                android:orientation="horizontal">
 
-                <TextView
-                    style="@style/MonolithEyebrow"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Шаги сегодня" />
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="20dp">
 
-                <TextView
-                    android:id="@+id/monolith_steps"
-                    style="@style/MonolithNumber"
-                    android:layout_width="wrap_content"
+                    <TextView
+                        style="@style/MonolithEyebrow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Пульс" />
+
+                    <TextView
+                        android:id="@+id/monolith_heart_rate"
+                        style="@style/MonolithNumber"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="—"
+                        android:textSize="26sp" />
+
+                    <TextView
+                        style="@style/MonolithEyebrow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="уд/мин"
+                        android:textColor="@color/monolith_signal_dim" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="match_parent"
+                    android:background="@color/monolith_seam" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:textSize="36sp" />
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        style="@style/MonolithEyebrow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Шаги" />
+
+                    <TextView
+                        android:id="@+id/monolith_steps"
+                        style="@style/MonolithNumber"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="—"
+                        android:textSize="26sp" />
+
+                    <TextView
+                        style="@style/MonolithEyebrow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="сегодня"
+                        android:textColor="@color/monolith_signal_dim" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="match_parent"
+                    android:background="@color/monolith_seam" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        style="@style/MonolithEyebrow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Воздух" />
+
+                    <TextView
+                        android:id="@+id/monolith_temperature"
+                        style="@style/MonolithNumber"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="—"
+                        android:textSize="26sp" />
+
+                    <TextView
+                        style="@style/MonolithEyebrow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="°C · погода"
+                        android:textColor="@color/monolith_signal_dim" />
+                </LinearLayout>
             </LinearLayout>
 
             <View

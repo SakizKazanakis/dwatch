@@ -32,16 +32,22 @@ import java.util.Locale;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.ControlCenterv2;
+import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils;
 import nodomain.freeyourgadget.gadgetbridge.activities.PermissionsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.welcome.WelcomeActivity;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceManager;
+import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.DailyTotals;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
+import nodomain.freeyourgadget.gadgetbridge.model.Weather;
+import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec;
 import nodomain.freeyourgadget.gadgetbridge.util.PermissionsUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
-/** Monolith dashboard ("Пульт"): link state, both batteries, steps, coordinates, quick actions. */
+/** Monolith dashboard ("Пульт"): link state, both batteries, pulse, steps, air temperature, coordinates, quick actions. */
 public class MonolithActivity extends AppCompatActivity {
     private static final int REQUEST_LOCATION = 41;
 
@@ -54,7 +60,9 @@ public class MonolithActivity extends AppCompatActivity {
     private ProgressBar watchBatteryBar;
     private TextView phoneBattery;
     private ProgressBar phoneBatteryBar;
+    private TextView heartRate;
     private TextView steps;
+    private TextView temperature;
     private TextView coords;
     private boolean finding;
     private GBDevice shownDevice;
@@ -89,7 +97,9 @@ public class MonolithActivity extends AppCompatActivity {
         watchBatteryBar = findViewById(R.id.monolith_watch_battery_bar);
         phoneBattery = findViewById(R.id.monolith_phone_battery);
         phoneBatteryBar = findViewById(R.id.monolith_phone_battery_bar);
+        heartRate = findViewById(R.id.monolith_heart_rate);
         steps = findViewById(R.id.monolith_steps);
+        temperature = findViewById(R.id.monolith_temperature);
         coords = findViewById(R.id.monolith_coords);
 
         TextView wordmark = findViewById(R.id.monolith_wordmark);
@@ -144,6 +154,7 @@ public class MonolithActivity extends AppCompatActivity {
         LocalBroadcastManager.getInstance(this).registerReceiver(deviceReceiver, filter);
         showPhoneBattery(registerReceiver(phoneBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED)));
         refreshDevice();
+        refreshTemperature();
         refreshLocation();
     }
 
@@ -178,6 +189,7 @@ public class MonolithActivity extends AppCompatActivity {
             setLink(false, "Нет устройства");
             watchBattery.setText("—");
             watchBatteryBar.setProgress(0);
+            heartRate.setText("—");
             steps.setText("—");
             return;
         }
@@ -205,8 +217,45 @@ public class MonolithActivity extends AppCompatActivity {
                 text = "—";
             }
             String shown = text;
-            runOnUiThread(() -> steps.setText(shown));
+            String pulse = latestHeartRate(forSteps);
+            runOnUiThread(() -> {
+                steps.setText(shown);
+                heartRate.setText(pulse);
+            });
         }).start();
+    }
+
+    /** Last valid heart-rate value recorded in the past 24 hours, or a dash. */
+    private static String latestHeartRate(GBDevice device) {
+        int now = (int) (System.currentTimeMillis() / 1000);
+        try (DBHandler db = GBApplication.acquireDB()) {
+            SampleProvider<? extends ActivitySample> provider =
+                    device.getDeviceCoordinator().getSampleProvider(device, db.getDaoSession());
+            if (provider == null) {
+                return "—";
+            }
+            List<? extends ActivitySample> samples = provider.getAllActivitySamples(now - 24 * 3600, now);
+            for (int i = samples.size() - 1; i >= 0; i--) {
+                int hr = samples.get(i).getHeartRate();
+                if (HeartRateUtils.getInstance().isValidHeartRateValue(hr)) {
+                    return String.valueOf(hr);
+                }
+            }
+        } catch (Exception e) {
+            // No database or no samples yet.
+        }
+        return "—";
+    }
+
+    /** Current air temperature from the weather Gadgetbridge last received (stored in kelvin). */
+    private void refreshTemperature() {
+        WeatherSpec spec = Weather.getInstance().getWeatherSpec();
+        if (spec == null) {
+            temperature.setText("—");
+            return;
+        }
+        int celsius = spec.currentTemp - 273;
+        temperature.setText((celsius > 0 ? "+" : "") + celsius + "°");
     }
 
     private void setLink(boolean connected, String label) {

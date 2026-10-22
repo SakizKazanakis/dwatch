@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monolith palette and theme, taken from the DIKRANON site tokens. -->
+<resources>
+    <color name="monolith_ink">#0D0F11</color>
+    <color name="monolith_slab">#15181B</color>
+    <color name="monolith_seam">#2A2F34</color>
+    <color name="monolith_steel">#9AA3AB</color>
+    <color name="monolith_bone">#E8E9E6</color>
+    <color name="monolith_signal">#CFE3EF</color>
+    <color name="monolith_signal_dim">#6F8794</color>
+
+    <style name="MonolithTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/monolith_ink</item>
+        <item name="android:statusBarColor">@color/monolith_ink</item>
+        <item name="android:navigationBarColor">@color/monolith_ink</item>
+        <item name="colorPrimary">@color/monolith_ink</item>
+        <item name="colorAccent">@color/monolith_signal</item>
+        <item name="android:textColor">@color/monolith_bone</item>
+    </style>
+
+    <style name="MonolithEyebrow">
+        <item name="android:fontFamily">@font/plex_mono</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:letterSpacing">0.18</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">@color/monolith_steel</item>
+    </style>
+
+    <style name="MonolithNumber">
+        <item name="android:fontFamily">@font/michroma</item>
+        <item name="android:textColor">@color/monolith_bone</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="MonolithAction">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">@drawable/monolith_cell</item>
+        <item name="android:fontFamily">@font/plex_mono</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:letterSpacing">0.12</item>
+        <item name="android:textColor">@color/monolith_bone</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:stateListAnimator">@null</item>
+    </style>
+</resources>
