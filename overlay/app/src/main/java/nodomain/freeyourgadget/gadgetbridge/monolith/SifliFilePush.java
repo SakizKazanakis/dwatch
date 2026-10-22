@@ -95,13 +95,18 @@ public class SifliFilePush {
 
     /** Sends the files; throws with a readable reason on failure. */
     public void push(List<Entry> files, int type) throws Exception {
-        pushWithStyle(files, type, null);
+        pushWithStyle(files, type);
     }
 
     /**
      * Tells the watch how to draw the clock over a custom background (Wearfit "new style"
      * command on its main channel). Location and font are the watch's own preset indices.
      */
+    /** The older style command (Wearfit TransferOrder.sendStyle) for watches without the new one. */
+    public static byte[] styleCommandOld(int r, int g, int b, int font, int location) {
+        return new byte[]{(byte) 0xAB, 0, 7, (byte) 0xFF, (byte) 0x9C, (byte) r, (byte) g, (byte) b, (byte) font, (byte) location};
+    }
+
     public static byte[] styleCommand(int r, int g, int b, int font, int location) {
         return new byte[]{(byte) 0xEA, 0, 9, 0, 13, 1, (byte) r, (byte) g, (byte) b, (byte) font, (byte) location, (byte) 0xFF};
     }
@@ -119,7 +124,8 @@ public class SifliFilePush {
      * Pushes files as a custom dial: announces the transfer, uploads, then confirms it and sends
      * {@code style} on the Wearfit write characteristic, as Wearfit Pro does.
      */
-    public void pushWithStyle(List<Entry> files, int type, byte[] style) throws Exception {
+    public void pushWithStyle(List<Entry> files, int type, byte[]... styles) throws Exception {
+        byte[][] style = styles.length > 0 ? styles : null;
         List<byte[]> payloads = new ArrayList<>();
         long total = 0;
         for (Entry e : files) {
@@ -149,8 +155,10 @@ public class SifliFilePush {
             }
             if (style != null) {
                 command(dialTransferState(1));
-                Thread.sleep(300);
-                command(style);
+                for (byte[] s : style) {
+                    Thread.sleep(300);
+                    command(s);
+                }
             }
         } finally {
             close();

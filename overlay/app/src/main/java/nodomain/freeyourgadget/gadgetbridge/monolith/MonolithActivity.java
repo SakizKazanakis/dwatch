@@ -198,16 +198,13 @@ public class MonolithActivity extends AppCompatActivity {
             return;
         }
         byte[] background;
-        byte[] thumbnail;
         try {
             background = readAsset("monolith/clock_bg.bin");
-            thumbnail = readAsset("monolith/clock_bg_thum.bin");
         } catch (Exception e) {
             showDialStatus("Не найден файл фона");
             return;
         }
         byte[] bg = background;
-        byte[] thumb = thumbnail;
         pushingDial = true;
         showDialStatus("Загрузка на часы…");
         String address = shownDevice.getAddress();
@@ -216,12 +213,16 @@ public class MonolithActivity extends AppCompatActivity {
             try {
                 SifliFilePush push = new SifliFilePush(this, address,
                         percent -> runOnUiThread(() -> showDialStatus("Загрузка на часы: " + percent + "%")));
+                // Wearfit picks ex/ or dyn/ by the watch's SiFli platform, which we don't learn
+                // over Gadgetbridge; older SF32LB55x watches read ex/. Send both, and both style
+                // command generations, so whichever the firmware uses finds the dial.
                 push.pushWithStyle(
                         Arrays.asList(
-                                new SifliFilePush.Entry("/dyn/resource/clock_bg.bin", bg),
-                                new SifliFilePush.Entry("/dyn/resource/clock_bg_thum.bin", thumb)),
+                                new SifliFilePush.Entry("/ex/resource/clock_bg.bin", bg),
+                                new SifliFilePush.Entry("/dyn/resource/clock_bg.bin", bg)),
                         SifliFilePush.TYPE_CUSTOM,
-                        SifliFilePush.styleCommand(0xE8, 0xE9, 0xE6, 0, 2));
+                        SifliFilePush.styleCommandOld(0xE8, 0xE9, 0xE6, 0, 1),
+                        SifliFilePush.styleCommand(0xE8, 0xE9, 0xE6, 0, 1));
                 result = "Фон установлен. Выбери на часах пользовательский циферблат.";
             } catch (Exception e) {
                 android.util.Log.w("Monolith", "dial background push failed", e);
