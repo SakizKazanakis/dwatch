@@ -1,0 +1,43 @@
+name: Build Dwatch APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: Gadgetbridge branch or tag to build from
+        default: master
+
+env:
+  UPSTREAM_URL: https://codeberg.org/Freeyourgadget/Gadgetbridge.git
+  UPSTREAM_REF: ${{ github.event.inputs.upstream_ref || 'master' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Gadgetbridge
+        run: git clone --depth 1 --branch "$UPSTREAM_REF" "$UPSTREAM_URL" upstream
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Apply Dwatch branding and patches
+        run: scripts/apply-branding.sh upstream
+
+      - name: Build debug APK
+        working-directory: upstream
+        run: ./gradlew --no-daemon assembleMainlineDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dwatch-debug-apk
+          path: upstream/app/build/outputs/apk/mainline/debug/*.apk
