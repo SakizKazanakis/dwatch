@@ -32,6 +32,7 @@ typedef struct monolith_renderer {
     unsigned width, height;
     int active;
     unsigned last_minute;
+    unsigned last_date;
     unsigned updates;
 } monolith_renderer;
 
