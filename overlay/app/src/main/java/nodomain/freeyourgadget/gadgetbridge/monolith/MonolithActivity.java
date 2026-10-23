@@ -154,7 +154,10 @@ public class MonolithActivity extends AppCompatActivity {
                 startActivity(new Intent(this, ControlCenterv2.class)));
         coords.setOnClickListener(v -> requestLocation());
         dialStatus = findViewById(R.id.monolith_dial_status);
-        findViewById(R.id.monolith_dial_bg).setOnClickListener(v -> pushDialBackground());
+        Button uploadButton = findViewById(R.id.monolith_dial_bg);
+        uploadButton.setEnabled(false);
+        uploadButton.setText("Передача заблокирована до проверки BLE-протокола");
+        showDialStatus("HK8 3407: запись на часы не разрешена до проверки протокола");
 
         deviceName.setOnClickListener(v -> {
             Intent discovery = discoveryIntent(this);
