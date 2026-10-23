@@ -42,6 +42,26 @@ No notifications / data payloads are captured. **The diagnostic does not interce
 
 The previously provided Wearfit Pro APK was statically inspected and includes classes with names such as `SifliWatchfaceService`, `SicheTransferMgr`, `SicheOtaMgr`, `SFWatchfaceFilePushManager`, and `CRC32MPEG2`. Their presence alone does not prove they execute for device code 3407, nor specify the exact on-wire protocol. The actual method bodies and a live transfer trace remain to be matched. **No device packet capture or firmware extraction has been performed.**
 
+## Direct Wearfit Pro APK check (local static inspection)
+
+Inspected the user-supplied `wearfit.zip` containing Wearfit Pro `com.wakeup.howear`
+`hw_5.6.17` / `2026101619`. From `classes6.dex` string IDs:
+
+- `/dyn/resource/` and `/dyn/resource/ai_clock_crop_bg.bin` are literal strings.
+- `isNewPath`, `getBoardType`, `startSendPic`, `startSendPicAi`, and
+  `pushWatchfaceFile` appear as method names.
+- `ctrl_packet.bin` appears in the APK, but is not evidence of a locally
+  obtained HK8 3407 firmware image.
+- No `/ex/` literal was found in the inspected `classes6.dex`. This **does
+  not prove** the `/ex/` path is unsupported: it may be constructed elsewhere
+  or belong to a different device/SDK.
+- The string `3407` was **not found** in the inspected `classes6.dex`;
+  code 3407 is known from the physical Wearfit Pro device-information screen,
+  not this APK's literals.
+
+This is a concrete static cross-reference, **not** reconstructed method behavior
+or captured upload packets. The uploader therefore stays disabled.
+
 ## Safe acceptance sequence
 
 1. Build and run static tests plus the platform-independent Java profile tests on CI.
