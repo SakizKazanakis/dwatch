@@ -114,6 +114,10 @@ public final class SifliWireCodecJvmTest {
         rejects(() -> badFinal.accept(hex("04 03 02")), "incomplete reassembly");
         assertTrue(SifliWireCodec.endFile().length == 4
                 && SifliWireCodec.end().length == 4, "end packet lengths");
+        rejects(() -> SifliWireCodec.requireExpectedResponse(hex("03 00 00 00"), 5), "stale ACK");
+        rejects(() -> SifliWireCodec.requireExpectedResponse(hex("05 00 04 00"), 5), "NACK");
+        rejects(() -> SifliWireCodec.requireExpectedResponse(hex("05 00"), 5), "short ACK");
+        assertTrue(SifliWireCodec.requireExpectedResponse(hex("05 00 00 00"), 5) == 0, "valid ACK");
         System.out.println("SifliWireCodecJvmTest: " + assertions + " assertions PASS");
     }
 
