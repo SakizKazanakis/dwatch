@@ -5,6 +5,7 @@
 #include "monolith_lvgl_v8_adapter.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 int monolith_lvgl_v8_open(monolith_lvgl_v8 *view,lv_obj_t *parent,
                            monolith_resource *r) {
@@ -21,12 +22,33 @@ int monolith_lvgl_v8_open(monolith_lvgl_v8 *view,lv_obj_t *parent,
     lv_obj_set_style_bg_color(view->root,lv_color_black(),0);
     lv_obj_align(view->root,LV_ALIGN_CENTER,0,0);
 
+    /* LVGL 8.3's stock software decoder DOES NOT draw LV_IMG_CF_RGB888:
+     * its supported true-colour path expects LV_COLOR_DEPTH=32 packed
+     * blue, green, red, alpha in memory. Convert actual eZIP RGB pixel data
+     * once, retain ownership until after lv_obj_del().
+     */
+#if LV_COLOR_DEPTH != 32
+    monolith_lvgl_v8_close(view);
+    return MONOLITH_UNSUPPORTED;
+#else
+    view->lvgl_pixel_bytes=((size_t)r->width*r->height)*4u;
+    view->lvgl_pixels=(uint8_t*)malloc(view->lvgl_pixel_bytes);
+    if(!view->lvgl_pixels){
+        monolith_lvgl_v8_close(view);return MONOLITH_NOMEM;
+    }
+    for(size_t i=0;i<(size_t)r->width*r->height;i++){
+        view->lvgl_pixels[i*4u]=r->rgb[i*3u+2u];
+        view->lvgl_pixels[i*4u+1u]=r->rgb[i*3u+1u];
+        view->lvgl_pixels[i*4u+2u]=r->rgb[i*3u];
+        view->lvgl_pixels[i*4u+3u]=255;
+    }
     view->image.header.always_zero=0;
     view->image.header.w=r->width;
     view->image.header.h=r->height;
-    view->image.header.cf=LV_IMG_CF_RGB888;
-    view->image.data_size=(uint32_t)r->rgb_size;
-    view->image.data=r->rgb;
+    view->image.header.cf=LV_IMG_CF_TRUE_COLOR;
+    view->image.data_size=(uint32_t)view->lvgl_pixel_bytes;
+    view->image.data=view->lvgl_pixels;
+#endif
     view->background=lv_img_create(view->root);
     if(!view->background){monolith_lvgl_v8_close(view);return MONOLITH_NOMEM;}
     lv_img_set_src(view->background,&view->image);
@@ -74,5 +96,6 @@ int monolith_lvgl_v8_resume(monolith_lvgl_v8 *v){
 void monolith_lvgl_v8_close(monolith_lvgl_v8 *v){
     if(!v)return;
     if(v->root)lv_obj_del(v->root);
+    free(v->lvgl_pixels);
     memset(v,0,sizeof(*v));
 }
