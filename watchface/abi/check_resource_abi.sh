@@ -8,7 +8,8 @@ clang --target=armv7a-none-eabihf -march=armv7-a -mthumb \
   -mfloat-abi=hard -mfpu=vfpv3-d16 -std=c11 -Wall -Wextra -Werror \
   -ffreestanding -c "$here/test_sifli_sdk_resource_abi.c" \
   -I "$here" -o "$obj"
-readelf -h "$obj" | grep -q 'ARM'
-readelf -h "$obj" | grep -q 'hard-float ABI'
+header="$(readelf -h "$obj")"
+printf '%s\n' "$header" | grep 'Machine:' | grep -q 'ARM'
+printf '%s\n' "$header" | grep 'Flags:' | grep -q 'hard-float ABI'
 echo 'PASS: Public SiFli resource manager has 44-byte ARM32 ABI and expected offsets.'
 echo 'NOTICE: This does not prove source-version parity with HK8 code 3407 firmware 2.09.'
