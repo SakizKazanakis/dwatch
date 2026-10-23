@@ -81,7 +81,23 @@ python3 scripts/hk8_watchface_registration_probe.py \
 
 Public CI runs arithmetic/structural checks but **skips** the sample-dependent test: proprietary device binaries are never included in this repository. Locally, the original specimen passed all seven probe tests.
 
-## 5. What still blocks a working Monolith module
+## 5. Offline native registration experiment — with a linker incompatibility detected and contained
+
+The repo also includes `watchface/prototypes/monolith_registration_hypothesis.c`, which models the observed `module_init` → `app_tileview_register_watchface` lifecycle with a **no-op callback**. Its `extern` C function-pointer signatures are **explicit hypotheses**, *not* verified OEM SDK declarations. Nothing from this model is called from the Android uploader.
+
+A first conventional Clang/LLD build generated `R_ARM_JUMP_SLOT` relocations, **unlike the captured OEM**, which uses `R_ARM_GLOB_DAT` and `R_ARM_RELATIVE`. Compiling a superficially matching ELF with the default PLT is therefore insufficient.
+
+The experiment now loads external imported addresses through indirect GOT references, using a compiler barrier in `RESOLVE()`. The resulting offline module is **ARM Thumb, ELF32, ET_DYN, ARM EABI5 hard-float** and its external symbol references are `R_ARM_GLOB_DAT`; CI explicitly rejects `R_ARM_JUMP_SLOT` and `R_ARM_COPY`. This matches *some* observed relocation classes and argument register placement, **not** the complete OEM relocation layout or supported loader semantics.
+
+To compile *locally without touching the watch*:
+
+```sh
+bash watchface/prototypes/build_registration_hypothesis.sh /tmp/monolith_registration_hypothesis.so
+```
+
+Do not treat this as a functional dial: `monolith_event_callback` does not draw a UI; its prototype, resource pack, `.dsc` and context structures are not independently validated. No such module is attached to a release or included in the APK.
+
+## 6. What still blocks a working Monolith module
 
 1. Precise types and semantics of the registration API, the callback context object, resources and locale pack are **not** recovered from a public header.
 2. The observed `R3` callback ABI shows event and context registers; its exact source-level return type, thread affinity and lifetime guarantees are unknown.
