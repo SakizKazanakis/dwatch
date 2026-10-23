@@ -52,6 +52,9 @@ public class SifliFilePush {
 
     private static final long COMMAND_TIMEOUT_MS = 60_000;
     private static final long WRITE_TIMEOUT_MS = 5_000;
+    private static final int MAX_SERIAL_PAYLOAD = 0xFFFF;
+    private static final int MAX_RX_BYTES = 0xFFFF;
+    private volatile boolean connected;
 
     public interface Listener {
         void onProgress(int percent);
@@ -133,7 +136,9 @@ public class SifliFilePush {
             payloads.add(data);
             total += data.length;
         }
-        try {
+        // Prevent accidental writing until the exact HK8 3407 path and protocol are verified.
+        throw new UnsupportedOperationException("Передача файлов заблокирована до проверки протокола HK8 3407");
+        /*try {
             connect();
             if (style != null) {
                 if (wearfitWrite == null) {
@@ -162,7 +167,7 @@ public class SifliFilePush {
             }
         } finally {
             close();
-        }
+        }*/
     }
 
     private void run(List<Entry> files, List<byte[]> payloads, int type, long total) throws Exception {
@@ -259,12 +264,18 @@ public class SifliFilePush {
     private final BluetoothGattCallback callback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt g, int status, int newState) {
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                events.add(new Exception("GATT connection status " + status));
+                return;
+            }
             if (newState == BluetoothProfile.STATE_CONNECTED) {
+                connected = true;
                 // The link is usually already up (Gadgetbridge holds it); some stacks refuse a second MTU request.
                 if (!g.requestMtu(247)) {
                     g.discoverServices();
                 }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                connected = false;
                 events.add(new Exception("связь с часами потеряна"));
                 synchronized (writeLock) {
                     writeStatus = -1;
@@ -276,12 +287,20 @@ public class SifliFilePush {
 
         @Override
         public void onMtuChanged(BluetoothGatt g, int newMtu, int status) {
-            mtu = newMtu;
-            g.discoverServices();
+            if (status == BluetoothGatt.GATT_SUCCESS && newMtu >= 23) {
+                mtu = newMtu;
+            } else {
+                mtu = 23;
+            }
+            if (!g.discoverServices()) events.add(new Exception("GATT discoverServices failed"));
         }
 
         @Override
         public void onServicesDiscovered(BluetoothGatt g, int status) {
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                events.add(new Exception("GATT service discovery status " + status));
+                return;
+            }
             for (BluetoothGattService service : g.getServices()) {
                 for (BluetoothGattCharacteristic c : service.getCharacteristics()) {
                     if (SERIAL_DATA.equals(c.getUuid())) {
@@ -295,19 +314,26 @@ public class SifliFilePush {
                 events.add(new Exception("на часах нет сервиса загрузки SiFli"));
                 return;
             }
-            g.setCharacteristicNotification(serial, true);
+            if (!g.setCharacteristicNotification(serial, true)) {
+                events.add(new Exception("Не удалось включить уведомления SiFli"));
+                return;
+            }
             BluetoothGattDescriptor d = serial.getDescriptor(CCCD);
             if (d == null) {
-                events.add("ready");
+                events.add(new Exception("Отсутствует CCCD 0x2902 для SiFli"));
                 return;
             }
             d.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-            g.writeDescriptor(d);
+            if (!g.writeDescriptor(d)) events.add(new Exception("CCCD write failed"));
         }
 
         @Override
         public void onDescriptorWrite(BluetoothGatt g, BluetoothGattDescriptor d, int status) {
-            events.add("ready");
+            if (!CCCD.equals(d.getUuid()) || !SERIAL_DATA.equals(d.getCharacteristic().getUuid()) || status != BluetoothGatt.GATT_SUCCESS) {
+                events.add(new Exception("CCCD write callback invalid: " + status));
+            } else {
+                events.add("ready");
+            }
         }
 
         @Override
@@ -388,6 +414,7 @@ public class SifliFilePush {
     private void send(byte[] message) throws Exception {
         int max = Math.min(mtu - 3, 244);
         int len = message.length;
+        if (max < 5 || len > MAX_SERIAL_PAYLOAD) throw new Exception("Недопустимый размер BLE пакета: " + len);
         if (len + 4 <= max) {
             ByteBuffer one = le(len + 4);
             one.put((byte) CATEGORY_WATCHFACE).put((byte) 0).putShort((short) len).put(message);
@@ -415,17 +442,27 @@ public class SifliFilePush {
         int category = v[0];
         int flag = v[1];
         if (flag == 0 && v.length >= 4) {
-            int len = Math.min(u16(v, 2), v.length - 4);
+            int len = u16(v, 2);
+            if (len != v.length - 4 || len > MAX_RX_BYTES) return;
             byte[] out = new byte[len];
             System.arraycopy(v, 4, out, 0, len);
             deliver(category, out);
         } else if (flag == 1 && v.length >= 4) {
-            rxBuffer = new byte[u16(v, 2)];
+            int claimedLength = u16(v, 2);
+            if (claimedLength > MAX_RX_BYTES || claimedLength < v.length - 4) {
+                rxBuffer = null;
+                return;
+            }
+            rxBuffer = new byte[claimedLength];
             rxIndex = 0;
             append(v, 4);
         } else if ((flag == 2 || flag == 3) && rxBuffer != null) {
             append(v, 2);
             if (flag == 3) {
+                if (rxIndex != rxBuffer.length) {
+                    rxBuffer = null;
+                    return;
+                }
                 deliver(category, rxBuffer);
                 rxBuffer = null;
             }
