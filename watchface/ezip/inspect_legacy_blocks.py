@@ -41,7 +41,7 @@ def parse(blob:bytes, exact_monolith:bool=False)->dict:
     rows,n=struct.unpack_from(">HH",z,16)
     if rows!=block_rows or n<1 or n>MAX_BLOCKS or n!=(h+block_rows-1)//block_rows:
         raise EzipFormatError("incorrect block count")
-    table_end=20+4*(n-1) # n start offsets, starting at z[20]
+    table_end=20+4*n # n start offsets, starting at z[20]
     if table_end>len(z):
         raise EzipFormatError("truncated offset table")
     offsets=[struct.unpack_from(">I",z,20+4*i)[0] for i in range(n)]
