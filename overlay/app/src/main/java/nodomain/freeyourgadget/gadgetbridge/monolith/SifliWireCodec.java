@@ -73,6 +73,15 @@ public final class SifliWireCodec {
         return (short) u16(response, 2);
     }
 
+    /** Strict acknowledgement validation for an offline-verified protocol. */
+    public static int requireExpectedResponse(byte[] response, int expectedOpcode) {
+        int status = responseStatus(response, expectedOpcode);
+        if (status != 0) {
+            throw new IllegalArgumentException("SiFli rejected command: " + status);
+        }
+        return status;
+    }
+
     private static int u16(byte[] b, int offset) {
         return (b[offset] & 255) | ((b[offset + 1] & 255) << 8);
     }

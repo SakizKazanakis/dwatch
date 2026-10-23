@@ -261,7 +261,13 @@ public class SifliFilePush {
         @Override
         public void onConnectionStateChange(BluetoothGatt g, int status, int newState) {
             if (status != BluetoothGatt.GATT_SUCCESS) {
+                connected = false;
                 events.add(new Exception("GATT connection status " + status));
+                synchronized (writeLock) {
+                    writeStatus = status;
+                    writeDone = true;
+                    writeLock.notifyAll();
+                }
                 return;
             }
             if (newState == BluetoothProfile.STATE_CONNECTED) {
@@ -461,7 +467,12 @@ public class SifliFilePush {
                 throw new Exception("часы не ответили на команду " + (command - 1));
             }
             byte[] rsp = responses.poll(Math.min(left, 500), TimeUnit.MILLISECONDS);
-            if (rsp != null && u16(rsp, 0) == command) {
+            if (rsp != null) {
+                try {
+                    SifliWireCodec.responseStatus(rsp, command);
+                } catch (IllegalArgumentException badReply) {
+                    throw new Exception("Несовпадение ответа SiFli на команду " + (command - 1), badReply);
+                }
                 return rsp;
             }
         }
