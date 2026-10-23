@@ -432,6 +432,20 @@
                     android:layout_marginTop="10dp"
                     android:text="Фон Monolith на часы" />
 
+                <Button
+                    android:id="@+id/monolith_ble_diagnose"
+                    style="@style/MonolithAction"
+                    android:layout_width="match_parent"
+                    android:layout_marginTop="10dp"
+                    android:text="BLE-диагностика (только чтение)" />
+
+                <Button
+                    android:id="@+id/monolith_ble_share"
+                    style="@style/MonolithAction"
+                    android:layout_width="match_parent"
+                    android:layout_marginTop="10dp"
+                    android:text="Экспорт BLE-отчёта" />
+
                 <TextView
                     android:id="@+id/monolith_dial_status"
                     style="@style/MonolithEyebrow"

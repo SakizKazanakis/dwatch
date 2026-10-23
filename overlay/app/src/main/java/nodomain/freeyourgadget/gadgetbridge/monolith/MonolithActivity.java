@@ -72,6 +72,10 @@ public class MonolithActivity extends AppCompatActivity {
     private Button find;
     private TextView dialStatus;
     private boolean pushingDial;
+    private Button bleDiagnosticButton;
+    private Button bleShareButton;
+    private String lastBleReport;
+    private boolean diagnosingBle;
     private Location lastLocation;
     private TextView weatherNote;
     private static long lastAutoSync;
@@ -154,7 +158,15 @@ public class MonolithActivity extends AppCompatActivity {
                 startActivity(new Intent(this, ControlCenterv2.class)));
         coords.setOnClickListener(v -> requestLocation());
         dialStatus = findViewById(R.id.monolith_dial_status);
-        findViewById(R.id.monolith_dial_bg).setOnClickListener(v -> pushDialBackground());
+        Button uploadButton = findViewById(R.id.monolith_dial_bg);
+        uploadButton.setEnabled(false);
+        uploadButton.setText("Передача заблокирована до проверки BLE-протокола");
+        showDialStatus("HK8 3407: запись на часы не разрешена до проверки протокола");
+        bleDiagnosticButton = findViewById(R.id.monolith_ble_diagnose);
+        bleShareButton = findViewById(R.id.monolith_ble_share);
+        bleShareButton.setEnabled(false);
+        bleDiagnosticButton.setOnClickListener(v -> startBleDiagnostics());
+        bleShareButton.setOnClickListener(v -> shareBleDiagnostics());
 
         deviceName.setOnClickListener(v -> {
             Intent discovery = discoveryIntent(this);
@@ -245,6 +257,50 @@ public class MonolithActivity extends AppCompatActivity {
             }
             return out.toByteArray();
         }
+    }
+
+    /** Performs GATT service discovery only. It never sends firmware or resource commands. */
+    private void startBleDiagnostics() {
+        if (diagnosingBle) return;
+        GBDevice device = shownDevice;
+        if (device == null) {
+            showDialStatus("Для диагностики сначала выбери часы в Monolith");
+            return;
+        }
+        diagnosingBle = true;
+        lastBleReport = null;
+        bleDiagnosticButton.setEnabled(false);
+        bleShareButton.setEnabled(false);
+        showDialStatus("Чтение GATT-профиля без записи...");
+
+        String deviceAddress = device.getAddress();
+        new Thread(() -> {
+            String report;
+            try {
+                report = new MonolithBleProbe(getApplicationContext(), deviceAddress).probeBlocking();
+            } catch (RuntimeException e) {
+                report = "Диагностика GATT завершилась ошибкой: " + e.getClass().getSimpleName()
+                        + " (" + e.getMessage() + ")";
+            }
+            String finishedReport = report;
+            runOnUiThread(() -> {
+                diagnosingBle = false;
+                bleDiagnosticButton.setEnabled(true);
+                lastBleReport = finishedReport;
+                bleShareButton.setEnabled(true);
+                showDialStatus(finishedReport);
+            });
+        }, "MonolithBleDiagnosis").start();
+    }
+
+    /** Android shares the report only after the user explicitly taps Export. */
+    private void shareBleDiagnostics() {
+        if (lastBleReport == null) return;
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("text/plain");
+        send.putExtra(Intent.EXTRA_SUBJECT, "Monolith HK8 BLE diagnostics");
+        send.putExtra(Intent.EXTRA_TEXT, lastBleReport);
+        startActivity(Intent.createChooser(send, "Экспорт BLE-отчёта"));
     }
 
     private void showDialStatus(String text) {
