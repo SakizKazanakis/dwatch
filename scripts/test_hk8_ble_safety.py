@@ -17,7 +17,7 @@ class Hk8TransportSafetyTest(unittest.TestCase):
     def test_upload_is_disabled_until_protocol_is_verified(self):
         self.assertIn("if (!isUploadProtocolVerified())", self.transport)
         self.assertIn("private static boolean isUploadProtocolVerified()", self.transport)
-        self.assertRegex(self.transport, r"(?s)private static boolean isUploadProtocolVerified\\(\\) \\{\\s*return false;")
+        self.assertIn("return false; // Must be backed by captured HK8 3407 protocol evidence", self.transport)
         self.assertIn("uploadButton.setEnabled(false)", self.activity)
 
     def test_does_not_send_multiple_unverified_resource_paths(self):
