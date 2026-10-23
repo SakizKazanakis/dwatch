@@ -59,6 +59,19 @@ The `R3` callback at `0x668` takes an event selector in `R0` and a pointer-like 
 
 In selector 0, code loads `[context+0x24]`, then calls `lv_cont_create(parent,0)`, `lv_obj_set_size(container,410,494)`, `lv_obj_align`, `lv_obj_set_parent_event`, `lv_page_glue_obj`, `wf_view_init`, `wf_obj_img_create`, and `wf_obj_analog_clock_create`. The function requests a **28-byte user-data object** via `dlmodule_get_user_data("wf_clock23",28)`. Two 12-byte static descriptors are copied from `.data` onto the stack and passed to resource creation calls. **Their C structure layout, individual fields and ownership semantics remain unverified.**
 
+### Static resource records passed to the UI creation calls
+
+The 12-byte records copied onto the stack by the event-0 handler were independently checked against the **correct ELF section-to-file mapping** (the `.data` section has a different file offset from `.text`). Values below are the raw little-endian 32-bit words, before runtime relocations:
+
+| Virtual record | Word 0 | Word 1 | Word 2 |
+|---|---|---|---|
+| `0xaf0` | `0x00000006` | `0` | `0x000008bf` |
+| `0xafc` | `0x00cd0005` | `0x000000f7` | `0x000009ec` |
+
+Relocated `0x8bf` points to `/ex/resource/wf_clock23/wf_clock23_bg.bin`. Relocated `0x9ec` points to a separate 36-byte table in `.data.rel.ro`, containing raw words and references to `wf_clock23_h.bin`, `wf_clock23_yuan_02.bin`, `wf_clock23_m.bin`, `wf_clock23_s.bin` and `wf_clock23_yuan_01.bin`.
+
+**The record field names, pixel/position encoding and the actual C struct type cannot yet be asserted.** We know the exact pointers and their referenced names, not their proprietary semantics.
+
 ### Destroying the module
 
 `module_cleanup`: Thumb entry `0x879`, 60 bytes. It calls `dlmodule_get_res_mng` on the incoming module argument; when the returned manager is non-null, it calls `lv_ext_res_mng_builtin_destroy(manager)` followed by `rt_free(manager)`. This cleanup logic is separate from the selector-3 view teardown.
