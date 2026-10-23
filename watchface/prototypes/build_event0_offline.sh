@@ -8,12 +8,16 @@ if [ "$#" -gt 0 ]; then out="$1"; fi
 cc -std=c11 -Wall -Wextra -Werror -I "$here" \
   "$here/monolith_event0.c" "$here/test_event0.c" \
   -o /tmp/monolith_event0_host_test
+cc -std=c11 -Wall -Wextra -Werror -I "$here" \
+  "$here/monolith_design_resource.c" "$here/test_design_resource.c" \
+  -o /tmp/monolith_design_host_test
+/tmp/monolith_design_host_test
 /tmp/monolith_event0_host_test
 
 clang --target=armv7a-none-eabihf -march=armv7-a -mthumb \
   -mfloat-abi=hard -mfpu=vfpv3-d16 -Oz -fPIC -nostdlib -fuse-ld=lld \
   -Wl,-shared -Wl,-Bsymbolic -Wl,--hash-style=sysv \
-  -o "$out" "$here/monolith_event0.c" "$here/monolith_event0_module.c"
+  -o "$out" "$here/monolith_event0.c" "$here/monolith_design_resource.c" "$here/monolith_event0_module.c"
 
 readelf -h "$out" | grep -q 'ELF32'
 readelf -h "$out" | grep -q 'hard-float ABI'
