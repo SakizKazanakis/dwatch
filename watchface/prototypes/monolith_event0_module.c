@@ -4,6 +4,7 @@
  */
 #include "monolith_event0.h"
 #include "monolith_design_resource.h"
+#include "../abi/sifli_sdk_resource_abi.h"
 #include <stdint.h>
 extern char app_tileview_register_watchface;
 extern char lv_cont_create, lv_obj_set_size, lv_obj_align;
@@ -11,7 +12,8 @@ extern char lv_obj_set_parent_event, lv_page_glue_obj;
 extern char wf_obj_img_create, dlmodule_get_user_data;
 extern char rt_malloc, rt_free, dlmodule_set_res_mng, dlmodule_get_res_mng;
 extern char lv_ext_res_mng_builtin_init, lv_ext_res_mng_builtin_destroy;
-extern char lv_ext_get_locale, lv_ext_set_locale, lv_i18n_lang_pack;
+extern char lv_ext_get_locale, lv_ext_set_locale;
+extern const sifli_lv_i18n_lang_t *lv_i18n_lang_pack[];
 
 /* Indirect relocations match the OEM GLOB_DAT class, not the complete ABI. */
 #define RESOLVE(name) ({ uintptr_t p=(uintptr_t)&name; __asm__ volatile("" : "+r"(p)); p; })
@@ -48,19 +50,25 @@ int monolith_watchface_register(void) {
     return ((registration_fn)RESOLVE(app_tileview_register_watchface))(
         "monolith",0,"/ex/installer_wf/monolith_tn.bin",native_event);
 }
+/* Matches the PUBLIC SiFli MODULE_INIT_DEF void entry signature.
+ * Private HK8 module-loader compatibility is still unverified. */
 __attribute__((visibility("default")))
-int module_init(void *module) {
-    void *mgr=((void*(*)(unsigned int))RESOLVE(rt_malloc))(44);
-    if (!mgr) return -1;
+void module_init(void *module) {
+    sifli_lv_res_mng_t *mgr =
+        ((void *(*)(unsigned int))RESOLVE(rt_malloc))(sizeof(sifli_lv_res_mng_t));
+    if (!mgr) return;
     ((void(*)(void*,void*))RESOLVE(dlmodule_set_res_mng))(module,mgr);
-    ((void(*)(void*,void*))RESOLVE(lv_ext_res_mng_builtin_init))(mgr,&lv_i18n_lang_pack);
-    void *loc=((void*(*)(void))RESOLVE(lv_ext_get_locale))();
-    ((void(*)(void*,void*))RESOLVE(lv_ext_set_locale))(mgr,loc);
-    return monolith_watchface_register();
+    ((sifli_lv_res_t (*)(sifli_lv_res_mng_t*,const sifli_lv_i18n_lang_pack_t*))
+        RESOLVE(lv_ext_res_mng_builtin_init))(mgr,lv_i18n_lang_pack);
+    const char *loc=((const char*(*)(void))RESOLVE(lv_ext_get_locale))();
+    ((sifli_lv_res_t (*)(sifli_lv_res_mng_t*,const char*))
+        RESOLVE(lv_ext_set_locale))(mgr,loc);
+    (void)monolith_watchface_register();
 }
 __attribute__((visibility("default")))
 void module_cleanup(void *module) {
-    void *mgr=((void*(*)(void*))RESOLVE(dlmodule_get_res_mng))(module);
+    sifli_lv_res_mng_t *mgr=((sifli_lv_res_mng_t*(*)(void*))
+                            RESOLVE(dlmodule_get_res_mng))(module);
     if (mgr) {
         ((void(*)(void*))RESOLVE(lv_ext_res_mng_builtin_destroy))(mgr);
         ((void(*)(void*))RESOLVE(rt_free))(mgr);

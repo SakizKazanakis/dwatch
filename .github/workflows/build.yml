@@ -56,6 +56,9 @@ jobs:
       - name: Compile offline Monolith registration hypothesis (never flash)
         run: bash watchface/prototypes/build_registration_hypothesis.sh "${RUNNER_TEMP}/monolith_registration_hypothesis.so"
 
+      - name: Assert real public SiFli resource manager ARM32 structure layout
+        run: bash watchface/abi/check_resource_abi.sh
+
       - name: Test LVGL event-0 container creation and ARM module offline
         run: bash watchface/prototypes/build_event0_offline.sh "${RUNNER_TEMP}/monolith_event0_offline.so"
 

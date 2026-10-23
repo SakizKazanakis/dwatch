@@ -9,15 +9,15 @@
 volatile unsigned int monolith_probe_state = 0;
 
 __attribute__((visibility("default")))
-int module_init(void) {
+void module_init(void *module) {
+    (void)module;
     monolith_probe_state = 1u;
-    return 0;
 }
 
 __attribute__((visibility("default")))
-int module_cleanup(void) {
+void module_cleanup(void *module) {
+    (void)module;
     monolith_probe_state = 0u;
-    return 0;
 }
 
 __attribute__((visibility("default")))
