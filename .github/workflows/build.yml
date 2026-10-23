@@ -22,6 +22,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate HK8 BLE safety guardrails
+        run: python3 -m unittest discover -s scripts -p "test_hk8_ble_safety.py" -v
+
       - name: Fetch Gadgetbridge
         run: git clone --depth 1 --branch "$UPSTREAM_REF" "$UPSTREAM_URL" upstream
 
