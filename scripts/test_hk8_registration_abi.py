@@ -49,6 +49,13 @@ class Hk8RegistrationAbiTest(unittest.TestCase):
             "rt_malloc","dlmodule_set_res_mng",
             "lv_ext_res_mng_builtin_init","lv_ext_get_locale",
             "lv_ext_set_locale","wf_clock23_register"])
+        self.assertEqual(result["ui_static_records"]["record_0xaf0"],
+                         ["0x6","0x0","0x8bf"])
+        self.assertEqual(result["ui_static_records"]["record_0xaf0_path"],
+                         "/ex/resource/wf_clock23/wf_clock23_bg.bin")
+        self.assertEqual(result["ui_static_records"]["record_0xafc"],
+                         ["0xcd0005","0xf7","0x9ec"])
+        self.assertEqual(len(result["ui_static_records"]["linked_resource_paths"]),6)
         self.assertEqual(result["cleanup_calls"],[
             "dlmodule_get_res_mng","lv_ext_res_mng_builtin_destroy","rt_free"])
 
