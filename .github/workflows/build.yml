@@ -44,6 +44,12 @@ jobs:
           java -cp /tmp/monolith-ble-unit nodomain.freeyourgadget.gadgetbridge.monolith.MonolithBleProfileJvmTest
           java -cp /tmp/monolith-ble-unit nodomain.freeyourgadget.gadgetbridge.monolith.SifliWireCodecJvmTest
 
+      - name: Check offline ARM EABI5 hard-float prototype
+        run: |
+          bash watchface/prototypes/build_abi_probe.sh "${RUNNER_TEMP}/monolith_abi_probe.so"
+          readelf -h "${RUNNER_TEMP}/monolith_abi_probe.so" | grep -q 'ARM'
+          readelf -h "${RUNNER_TEMP}/monolith_abi_probe.so" | grep -q 'hard-float ABI'
+
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Apply Monolith branding and patches
