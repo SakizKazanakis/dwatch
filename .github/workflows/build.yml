@@ -38,8 +38,17 @@ jobs:
           mkdir -p /tmp/monolith-ble-unit
           javac -d /tmp/monolith-ble-unit \
             overlay/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/monolith/MonolithBleProfile.java \
-            tests/MonolithBleProfileJvmTest.java
+            tests/MonolithBleProfileJvmTest.java \
+            overlay/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/monolith/SifliWireCodec.java \
+            tests/SifliWireCodecJvmTest.java
           java -cp /tmp/monolith-ble-unit nodomain.freeyourgadget.gadgetbridge.monolith.MonolithBleProfileJvmTest
+          java -cp /tmp/monolith-ble-unit nodomain.freeyourgadget.gadgetbridge.monolith.SifliWireCodecJvmTest
+
+      - name: Check offline ARM EABI5 hard-float prototype
+        run: |
+          bash watchface/prototypes/build_abi_probe.sh "${RUNNER_TEMP}/monolith_abi_probe.so"
+          readelf -h "${RUNNER_TEMP}/monolith_abi_probe.so" | grep -q 'ARM'
+          readelf -h "${RUNNER_TEMP}/monolith_abi_probe.so" | grep -q 'hard-float ABI'
 
       - uses: gradle/actions/setup-gradle@v4
 

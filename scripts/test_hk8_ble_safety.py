@@ -32,11 +32,18 @@ class Hk8TransportSafetyTest(unittest.TestCase):
         self.assertIn("CCCD write callback invalid", self.transport)
 
     def test_rejects_truncated_single_frame(self):
-        self.assertIn("if (len != v.length - 4", self.transport)
-        self.assertIn("if (rxIndex != rxBuffer.length)", self.transport)
+        self.assertIn("SifliWireCodec.Reassembler", self.transport)
+        self.assertIn("serialReassembler.accept(v)", self.transport)
 
     def test_transmitted_message_cannot_wrap_16_bit_length(self):
-        self.assertIn("len > MAX_SERIAL_PAYLOAD", self.transport)
+        self.assertIn("SifliWireCodec.frame(CATEGORY_WATCHFACE, message, mtu)", self.transport)
+
+    def test_real_hci_wire_codec_is_used_by_upload_stub(self):
+        self.assertIn("SifliWireCodec.start(type, total)", self.transport)
+        self.assertIn("SifliWireCodec.fileStart(", self.transport)
+        self.assertIn("SifliWireCodec.data(i + 1, data, off, len)", self.transport)
+        self.assertIn("SifliWireCodec.endFile()", self.transport)
+        self.assertIn("SifliWireCodec.end()", self.transport)
 
     def test_device_characteristics_remain_bound_to_observed_gatt(self):
         self.assertIn("00000000-0000-0200-6473-5f696c666973", self.transport)
