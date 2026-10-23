@@ -52,15 +52,62 @@ Inspected the user-supplied `wearfit.zip` containing Wearfit Pro `com.wakeup.how
   `pushWatchfaceFile` appear as method names.
 - `ctrl_packet.bin` appears in the APK, but is not evidence of a locally
   obtained HK8 3407 firmware image.
-- No `/ex/` literal was found in the inspected `classes6.dex`. This **does
-  not prove** the `/ex/` path is unsupported: it may be constructed elsewhere
-  or belong to a different device/SDK.
+- **Correction (verified by method-level DEX inspection):** `classes6.dex`
+  includes the concrete paths `ex/resource/clock_bg.bin`,
+  `dyn/resource/clock_bg.bin`, `ex/clock_bg.zip`, and
+  `/dyn/resource/ai_clock_crop_bg.bin`. A previous string-only check that
+  reported no `/ex/` path was insufficient and is superseded.
 - The string `3407` was **not found** in the inspected `classes6.dex`;
   code 3407 is known from the physical Wearfit Pro device-information screen,
   not this APK's literals.
 
 This is a concrete static cross-reference, **not** reconstructed method behavior
 or captured upload packets. The uploader therefore stays disabled.
+
+## PHASE 03 — direct DEX method inspection (23 October 2026)
+
+The attached Wearfit Pro base APK SHA-256 is
+`ec085779aac38d130171cf536c76eaa409729b9a073719a5c80ee9c9c4f3d588`.
+The following findings come from reading Dalvik method definitions/instructions,
+**not just strings or matching method names**.
+
+1. `classes5.dex`:
+   - `com.wakeup.common.utils.SicheUtils.isNewPath(int):boolean` returns
+     **true** if and only if the input is **5, 8, or 13**.
+   - `SicheUtils.getBoardType(int):int` maps **4→1**, **8→1**,
+     **5→2**, **13→3**, and all other inputs to **0**.
+   - These mappings were reconstructed from branch-targeted DEX instructions
+     in the methods (16 and 22 code units respectively).
+2. `classes6.dex`:
+   - `SicheTransferMgr2.siCheCustomDial` and
+     `SicheTransferMgr.siCheCustomDial` call
+     `DeviceLocalSupports.getType()`, then pass that integer to
+     `SicheUtils.isNewPath(int)` and `SicheUtils.getBoardType(int)`.
+   - In `SicheTransferMgr2.siCheCustomDial`, the `isNewPath` result
+     selects `dyn/resource/clock_bg.bin` when true, or
+     `ex/resource/clock_bg.bin` when false (DEX branch at code unit 61,
+     strings at code units 63 and 66). The method builds
+     `ex/clock_bg.zip` as a local output and invokes
+     `sifliEzipUtil.pngToEzip` with pixel format `rgb888`.
+   - `SicheTransferMgr.siCheCustomDial` also references
+     `rgb888`, `ex/resource/`, `dyn/resource/` and the same
+     `isNewPath/getBoardType` logic; it also handles thumbnail files.
+   - `SicheTransferMgr.startPushDiyDial` obtains
+     `DeviceLocalSupports.getType()` and uses `getBoardType`;
+     it references `rgb888a` for a different resource path.
+3. **Critical disambiguation:** The numeric argument used by these methods
+   is a locally stored **DeviceLocalSupports type**, *not* the displayed
+   Wearfit **Code 3407**. No evidence currently maps code `3407` to
+   type `4`, `5`, `8`, or `13`. Therefore the *actual* upload
+   directory, boardType and zip layout for this watch remain **UNKNOWN**.
+4. The existence of path/codec logic **does not** demonstrate that the
+   installed HK8 firmware permits external file writes or .so execution.
+   The upload guard stays disabled.
+
+**Evidence limits:** This method-level decoding proves the control-flow
+of the named functions. No Wearfit Pro transfer was sniffed from the
+physical watch and no live selection of `DeviceLocalSupports.getType()`
+was observed.
 
 ## Safe acceptance sequence
 
