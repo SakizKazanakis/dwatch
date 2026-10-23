@@ -100,7 +100,22 @@ The following findings come from reading Dalvik method definitions/instructions,
    Wearfit **Code 3407**. No evidence currently maps code `3407` to
    type `4`, `5`, `8`, or `13`. Therefore the *actual* upload
    directory, boardType and zip layout for this watch remain **UNKNOWN**.
-4. The existence of path/codec logic **does not** demonstrate that the
+4. In `classes2.dex`, the SiFli SDK method
+   `SFWatchfaceFilePushManager.pushWatchfaceFile(String,int,String,boolean,int)`
+   validates the input ZIP path, checks `isBusy`, and invokes
+   `UnzipHelper.unzipAsync`. Its embedded validation error is
+   `maxFileSliceLength is not valid.(1-10)*1024 required`.
+   Another overload calls `SFPushInfoMaker.makePushInfos` for a
+   file list. This is direct evidence of ZIP-based file push and a
+   1–10 KiB slice-size constraint **in the SDK**, not evidence that the
+   watch accepted any particular command or slice size.
+5. `SicheTransferMgr2.siCheCustomDial` prepares `ex/clock_bg.zip`
+   and references both paths as alternative destination names.
+   **Sending duplicate files to both destinations** (as the earlier
+   Monolith prototype attempted) does not reproduce this conditional
+   decision.
+
+6. The existence of path/codec logic **does not** demonstrate that the
    installed HK8 firmware permits external file writes or .so execution.
    The upload guard stays disabled.
 
