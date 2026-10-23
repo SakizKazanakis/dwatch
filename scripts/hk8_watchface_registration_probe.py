@@ -99,6 +99,15 @@ def inspect(path):
        "ui_event0":{"context_parent_offset":0x24,"width":410,"height":494,
                     "called_imports":[function_at_literal(x) for x in
                        [0x78c,0x790,0x794,0x798,0x79c,0x7a0,0x7a4,0x7ac,0x7b0]]},
+       "ui_static_records":{
+          "record_0xaf0":[hex(u32(0xaf0)),hex(u32(0xaf4)),hex(u32(0xaf8))],
+          "record_0xaf0_path":ascii_at(u32(0xaf8)),
+          "record_0xafc":[hex(u32(0xafc)),hex(u32(0xb00)),hex(u32(0xb04))],
+          "record_0xafc_link_table":hex(u32(0xb04)),
+          "linked_resource_paths":[ascii_at(u32(x)) for x in
+                                   [0x9ec,0x9f0,0x9f8,0x9fc,0xa04,0xa08]],
+          "record_field_meanings":"UNKNOWN; raw words + relocated string pointers only"
+       },
        "events_inferred_from_control_flow":{"0":"create","1":"resume",
                                            "2":"pause","3":"destroy"},
        "not_proven":["external C prototypes","third-party loader acceptance",
