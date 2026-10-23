@@ -67,6 +67,17 @@ jobs:
           python3 scripts/check_monolith_existing_dial.py overlay/app/src/main/assets/monolith/clock_bg.bin
           python3 -m unittest discover -s scripts -p "test_monolith_existing_dial.py" -v
 
+      - name: Verify eZIP OEM display evidence and resource lifetime bounds
+        run: python3 -m unittest discover -s scripts -p "test_hk8_ezip_display_audit.py" -v
+
+      - name: Host-test OEM view and resource lifetime model (no hardware)
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror \
+            watchface/prototypes/monolith_oem_lifetime_mock.c \
+            watchface/prototypes/test_oem_lifetime_mock.c \
+            -o "${RUNNER_TEMP}/hk8_oem_lifetime_mock"
+          "${RUNNER_TEMP}/hk8_oem_lifetime_mock"
+
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Apply Monolith branding and patches
