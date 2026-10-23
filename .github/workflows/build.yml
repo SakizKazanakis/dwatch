@@ -38,8 +38,11 @@ jobs:
           mkdir -p /tmp/monolith-ble-unit
           javac -d /tmp/monolith-ble-unit \
             overlay/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/monolith/MonolithBleProfile.java \
-            tests/MonolithBleProfileJvmTest.java
+            tests/MonolithBleProfileJvmTest.java \
+            overlay/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/monolith/SifliWireCodec.java \
+            tests/SifliWireCodecJvmTest.java
           java -cp /tmp/monolith-ble-unit nodomain.freeyourgadget.gadgetbridge.monolith.MonolithBleProfileJvmTest
+          java -cp /tmp/monolith-ble-unit nodomain.freeyourgadget.gadgetbridge.monolith.SifliWireCodecJvmTest
 
       - uses: gradle/actions/setup-gradle@v4
 
