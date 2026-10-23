@@ -57,6 +57,14 @@ public final class SifliWireCodecJvmTest {
         assertTrue(fileStart.length == 10 + path.length, "path field length");
         assertTrue(fileStart[0] == 2 && fileStart[1] == 0, "file start opcode");
         assertTrue((fileStart[8] & 0xFF) == path.length, "path length LE");
+        byte[] capturedFirstFile = hex("04 00 33 00 02 00 2f 00 f4 6d 00 00 29 00");
+        byte[] stockFirstFile = SifliWireCodec.frame(4,
+                SifliWireCodec.fileStart("/ex/resource/wf_clock23/wf_clock23_bg.bin", 28148), 517)
+                .get(0);
+        assertTrue(stockFirstFile.length == 55, "OEM first FILE_START frame length");
+        assertTrue(Arrays.equals(capturedFirstFile, Arrays.copyOf(stockFirstFile, capturedFirstFile.length)),
+                "captured OEM first FILE_START header bytes");
+
 
         byte[] sample = new byte[4096];
         for (int i = 0; i < sample.length; ++i) sample[i] = (byte) (i * 17 + 3);
