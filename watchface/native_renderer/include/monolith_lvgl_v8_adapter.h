@@ -11,6 +11,8 @@ typedef struct {
     lv_obj_t *time_label;
     lv_obj_t *date_label;
     lv_img_dsc_t image;
+    uint8_t *lvgl_pixels;
+    size_t lvgl_pixel_bytes;
     monolith_resource *resource;
     unsigned minute_key,date_key;
     unsigned updates;
