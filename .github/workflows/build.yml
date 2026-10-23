@@ -59,6 +59,9 @@ jobs:
       - name: Test LVGL event-0 container creation and ARM module offline
         run: bash watchface/prototypes/build_event0_offline.sh "${RUNNER_TEMP}/monolith_event0_offline.so"
 
+      - name: Verify HK8 original LVGL resource descriptor parser
+        run: python3 -m unittest discover -s scripts -p "test_hk8_lvgl_resource_inspector.py" -v
+
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Apply Monolith branding and patches
