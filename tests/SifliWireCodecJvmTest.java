@@ -56,7 +56,7 @@ public final class SifliWireCodecJvmTest {
         byte[] fileStart = SifliWireCodec.fileStart("/ex/installer_wf/wf_clock23.so", 3416);
         assertTrue(fileStart.length == 10 + path.length, "path field length");
         assertTrue(fileStart[0] == 2 && fileStart[1] == 0, "file start opcode");
-        assertTrue((fileStart[6] & 0xFF) == path.length, "path length LE");
+        assertTrue((fileStart[8] & 0xFF) == path.length, "path length LE");
 
         byte[] sample = new byte[4096];
         for (int i = 0; i < sample.length; ++i) sample[i] = (byte) (i * 17 + 3);
