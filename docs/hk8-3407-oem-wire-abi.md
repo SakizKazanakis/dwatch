@@ -64,6 +64,17 @@ Verified via `readelf -h -s -d` after excluding the four-byte CRC trailers:
 
 Other imported symbol names of the OEM executable include `app_tileview_register_watchface`, `wf_view_init`, `rt_malloc`, `rt_free`, `lv_cont_create`, `lv_obj_align`, and `dlmodule_set_res_mng`. Their presence proves an ABI dependency, **not** function signatures or an independent extension API.
 
+### OEM dynamic-linking details
+
+The stock `wf_clock23.so` uses a SysV `DT_HASH` table and `DT_REL`
+relocation entries (25 `R_ARM_GLOB_DAT`, 8 `R_ARM_RELATIVE`).
+The stock `wf_clock23_res.so` also uses `DT_REL` (78
+`R_ARM_RELATIVE`, 52 `R_ARM_ABS32`). No `DT_NEEDED` entries were
+observed in either file. The offline `monolith_abi_probe.so` compiles as
+ARM hard-float ELF32 `ET_DYN`, but its relocation content differs because
+it contains no OEM imports. Matching ELF-header flags alone does not establish
+that the stock dynamic loader can resolve third-party modules.
+
 ### Descriptor `wf_clock23.dsc` (observed, no invented field semantics)
 
 Total transferred size: 88 bytes (84 bytes descriptor body followed by 4-byte CRC). The 84-byte body has these tagged length-prefixed zero-terminated ASCII values:
