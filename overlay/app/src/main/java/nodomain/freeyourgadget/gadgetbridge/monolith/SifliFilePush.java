@@ -87,8 +87,8 @@ public class SifliFilePush {
     private boolean writeDone;
     private int writeStatus;
 
-    private byte[] rxBuffer;
-    private int rxIndex;
+    private final SifliWireCodec.Reassembler serialReassembler =
+            new SifliWireCodec.Reassembler(CATEGORY_WATCHFACE);
 
     public SifliFilePush(Context context, String address, Listener listener) {
         this.context = context.getApplicationContext();
@@ -178,9 +178,7 @@ public class SifliFilePush {
 
     private void run(List<Entry> files, List<byte[]> payloads, int type, long total) throws Exception {
         // Total start: type, protocol flag 2, total length.
-        ByteBuffer start = le(11);
-        start.putShort((short) CMD_START).putShort((short) 7).putShort((short) type).put((byte) 2).putInt((int) total);
-        send(start.array());
+        send(SifliWireCodec.start(type, total));
         byte[] rsp = await(CMD_START + 1);
         check(rsp, "старт");
         int remoteVersion = 0;
@@ -213,10 +211,8 @@ public class SifliFilePush {
             byte[] name = files.get(f).path.getBytes(StandardCharsets.UTF_8);
             byte[] data = payloads.get(f);
 
-            ByteBuffer fileStart = le(10 + name.length);
-            // Body: file length (u32), name length (u16), name.
-            fileStart.putShort((short) CMD_FILE_START).putShort((short) (name.length + 6)).putInt(data.length).putShort((short) name.length).put(name);
-            send(fileStart.array());
+            // Wire format verified against the HCI-captured OEM wf_clock23 transfer.
+            send(SifliWireCodec.fileStart(files.get(f).path, data.length));
             check(await(CMD_FILE_START + 1), "файл");
 
             int count = (data.length + partLen - 1) / partLen;
@@ -224,9 +220,7 @@ public class SifliFilePush {
             for (int i = 0; i < count; i++) {
                 int off = i * partLen;
                 int len = Math.min(partLen, data.length - off);
-                ByteBuffer part = le(8 + len);
-                part.putShort((short) CMD_FILE_DATA).putShort((short) (len + 4)).putInt(i + 1).put(data, off, len);
-                send(part.array());
+                send(SifliWireCodec.data(i + 1, data, off, len));
                 byte[] dataRsp = await(CMD_FILE_DATA + 1);
                 int result = dataRsp.length >= 4 ? s16(dataRsp, 2) : -1;
                 if (result == 4 || result == 7) {
@@ -253,15 +247,11 @@ public class SifliFilePush {
             }
             sent += data.length;
 
-            ByteBuffer fileEnd = le(4);
-            fileEnd.putShort((short) CMD_FILE_END).putShort((short) 0);
-            send(fileEnd.array());
+            send(SifliWireCodec.endFile());
             check(await(CMD_FILE_END + 1), "конец файла");
         }
 
-        ByteBuffer end = le(4);
-        end.putShort((short) CMD_END).putShort((short) 0);
-        send(end.array());
+        send(SifliWireCodec.end());
         check(await(CMD_END + 1), "завершение");
     }
 
@@ -416,69 +406,23 @@ public class SifliFilePush {
         }
     }
 
-    /** Serial transport framing: [category, flag, len16] then continuation packets [category, flag]. */
+    /** SiFli serial packet framing is tested offline against the original captured HCI. */
     private void send(byte[] message) throws Exception {
-        int max = Math.min(mtu - 3, 244);
-        int len = message.length;
-        if (max < 5 || len > MAX_SERIAL_PAYLOAD) throw new Exception("Недопустимый размер BLE пакета: " + len);
-        if (len + 4 <= max) {
-            ByteBuffer one = le(len + 4);
-            one.put((byte) CATEGORY_WATCHFACE).put((byte) 0).putShort((short) len).put(message);
-            write(serial, one.array(), BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
-            return;
-        }
-        ByteBuffer first = le(max);
-        first.put((byte) CATEGORY_WATCHFACE).put((byte) 1).putShort((short) len).put(message, 0, max - 4);
-        write(serial, first.array(), BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
-        int off = max - 4;
-        while (off < len) {
-            int chunk = Math.min(max - 2, len - off);
-            boolean last = off + chunk == len;
-            ByteBuffer next = le(chunk + 2);
-            next.put((byte) CATEGORY_WATCHFACE).put((byte) (last ? 3 : 2)).put(message, off, chunk);
-            write(serial, next.array(), BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
-            off += chunk;
+        for (byte[] frame : SifliWireCodec.frame(CATEGORY_WATCHFACE, message, mtu)) {
+            // No-response flow-control remains NOT verified for this Android BLE stack.
+            // Do not enable the upload gate until it is confirmed with hardware evidence.
+            write(serial, frame, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
         }
     }
 
+    /** Reassemble only complete well-formed SiFli logical messages. */
     private void receive(byte[] v) {
-        if (v == null || v.length < 2) {
-            return;
+        try {
+            byte[] message = serialReassembler.accept(v);
+            if (message != null) deliver(CATEGORY_WATCHFACE, message);
+        } catch (IllegalArgumentException malformed) {
+            android.util.Log.w("Monolith", "Dropping malformed SiFli frame", malformed);
         }
-        int category = v[0];
-        int flag = v[1];
-        if (flag == 0 && v.length >= 4) {
-            int len = u16(v, 2);
-            if (len != v.length - 4 || len > MAX_RX_BYTES) return;
-            byte[] out = new byte[len];
-            System.arraycopy(v, 4, out, 0, len);
-            deliver(category, out);
-        } else if (flag == 1 && v.length >= 4) {
-            int claimedLength = u16(v, 2);
-            if (claimedLength > MAX_RX_BYTES || claimedLength < v.length - 4) {
-                rxBuffer = null;
-                return;
-            }
-            rxBuffer = new byte[claimedLength];
-            rxIndex = 0;
-            append(v, 4);
-        } else if ((flag == 2 || flag == 3) && rxBuffer != null) {
-            append(v, 2);
-            if (flag == 3) {
-                if (rxIndex != rxBuffer.length) {
-                    rxBuffer = null;
-                    return;
-                }
-                deliver(category, rxBuffer);
-                rxBuffer = null;
-            }
-        }
-    }
-
-    private void append(byte[] v, int from) {
-        int n = Math.min(v.length - from, rxBuffer.length - rxIndex);
-        System.arraycopy(v, from, rxBuffer, rxIndex, n);
-        rxIndex += n;
     }
 
     private void deliver(int category, byte[] payload) {
