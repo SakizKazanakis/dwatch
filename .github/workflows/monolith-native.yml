@@ -1,0 +1,85 @@
+name: Monolith native eZIP and LVGL verification
+
+on:
+  push:
+    branches:
+      - 'feature/monolith-ezip-block-parser-20261023'
+  pull_request:
+    paths:
+      - 'watchface/ezip/**'
+      - 'watchface/native_renderer/**'
+      - 'tests/test_monolith_ezip*'
+      - 'tests/check_lvgl_headless_frame.py'
+      - '.github/workflows/monolith-native.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-monolith:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct original BIN and run real-source Python regression
+        run: |
+          python3 -m unittest discover -s tests -p 'test_monolith_ezip_legacy_blocks.py' -v
+          python3 -m unittest discover -s tests -p 'test_monolith_ezip_decoder.py' -v
+          python3 watchface/ezip/decode_shared_huffman.py \
+            overlay/app/src/main/assets/monolith/clock_bg.bin \
+            --output "${RUNNER_TEMP}/clock_bg_redecoded.png" \
+            --report "${RUNNER_TEMP}/clock_bg_metrics.json"
+      - name: Compare decoded pixels with independently verified master PNG
+        run: |
+          curl -fsSL --retry 3 \
+            https://raw.githubusercontent.com/SakizKazanakis/dwatch/5a701d3ed1a1e7eef0730e98dbb67d9e17792bd4/dial/monolith/clock_bg.png \
+            -o "${RUNNER_TEMP}/original_clock_bg.png"
+          echo "53a65f602d7266e1e6b54279a40439a828d7bb51d05ecf0a33b97b37c01186bf  ${RUNNER_TEMP}/original_clock_bg.png" | sha256sum -c -
+          python3 watchface/ezip/decode_shared_huffman.py \
+            overlay/app/src/main/assets/monolith/clock_bg.bin \
+            --output "${RUNNER_TEMP}/clock_bg_redecoded.png" \
+            --reference-png "${RUNNER_TEMP}/original_clock_bg.png" \
+            --report "${RUNNER_TEMP}/clock_bg_metrics.json"
+      - name: Build native C11 decoder and lifecycle stress suite
+        run: |
+          cmake -S watchface/native_renderer -B "${RUNNER_TEMP}/monolith-native" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "${RUNNER_TEMP}/monolith-native" --parallel 4
+          ctest --test-dir "${RUNNER_TEMP}/monolith-native" --output-on-failure
+      - name: Verify actual native RGB decoded bytes
+        run: |
+          python3 -c 'from pathlib import Path; import hashlib; x=Path("'"${RUNNER_TEMP}"'/monolith-native/decoded.ppm").read_bytes().split(b"\n",3)[3]; assert len(x)==756600 and hashlib.sha256(x).hexdigest()=="1b02602419be4dd7c8e9db64073df99621d6542fa0c1eb5bfec685d46d77a940"; print("PASS: exact C11 RGB888 output")'
+      - name: Check memory safety under ASan and UBSan
+        run: |
+          cc -O1 -g -std=c11 -Wall -Wextra -Werror \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I watchface/native_renderer/include \
+            watchface/native_renderer/src/monolith_ezip_native.c \
+            watchface/native_renderer/src/monolith_framebuffer.c \
+            watchface/native_renderer/tests/test_renderer_stress.c \
+            -o "${RUNNER_TEMP}/monolith-stress-asan"
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+            "${RUNNER_TEMP}/monolith-stress-asan" \
+            overlay/app/src/main/assets/monolith/clock_bg.bin
+      - name: Test real LVGL 8.3.11 headless framebuffer
+        run: |
+          MONOLITH_LVGL_TEST_DIR="${RUNNER_TEMP}/monolith-lvgl" \
+            bash watchface/native_renderer/tests/run_lvgl_v8_headless.sh
+      - name: Install ARM cross compiler (no target deployment)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends clang-18 lld-18
+      - name: Compile OFFLINE noninstallable ARM ELF32 ET_DYN
+        run: |
+          bash watchface/native_renderer/build_arm_offline.sh "${RUNNER_TEMP}/monolith_native_NOT_INSTALLABLE.so"
+          readelf -Ws "${RUNNER_TEMP}/monolith_native_NOT_INSTALLABLE.so" | grep -E 'UND.*(malloc|free)' 
+      - name: Upload offline verification records only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monolith-phase05-offline-results
+          path: |
+            ${{ runner.temp }}/clock_bg_metrics.json
+            ${{ runner.temp }}/clock_bg_redecoded.png
+            ${{ runner.temp }}/monolith-lvgl/monolith_lvgl_frame.ppm
+          if-no-files-found: warn

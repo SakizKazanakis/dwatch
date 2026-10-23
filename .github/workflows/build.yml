@@ -84,6 +84,14 @@ jobs:
       - name: Validate independent Monolith desktop renderer
         run: python3 -m unittest discover -s tests -p "test_monolith_offline_renderer.py" -v
 
+      - name: Test fail-closed legacy eZIP block-table parser
+        run: |
+          python3 -m unittest discover -s tests -p "test_monolith_ezip_legacy_blocks.py" -v
+          python3 watchface/ezip/inspect_legacy_blocks.py \
+            overlay/app/src/main/assets/monolith/clock_bg.bin \
+            --require-original-monolith \
+            --json "${RUNNER_TEMP}/monolith-ezip-block-layout.json"
+
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Apply Monolith branding and patches
