@@ -25,4 +25,5 @@ if readelf -rW "$out" | grep -Eq 'R_ARM_JUMP_SLOT|R_ARM_COPY'; then
   echo >&2 'Unexpected PLT/COPY relocation; this differs from OEM transfer.'
   exit 1
 fi
+python3 "${here}/../../scripts/check_hk8_arm_module.py" "$out"
 echo 'PASS: offline ARM32 event0 + GOT imports (NOT run on HK8)'
