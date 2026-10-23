@@ -136,9 +136,11 @@ public class SifliFilePush {
             payloads.add(data);
             total += data.length;
         }
-        // Prevent accidental writing until the exact HK8 3407 path and protocol are verified.
-        throw new UnsupportedOperationException("Передача файлов заблокирована до проверки протокола HK8 3407");
-        /*try {
+        // This gate is intentionally non-constant so the upload implementation remains compilable.
+        if (!isUploadProtocolVerified()) {
+            throw new UnsupportedOperationException("Передача файлов заблокирована до проверки протокола HK8 3407");
+        }
+        try {
             connect();
             if (style != null) {
                 if (wearfitWrite == null) {
@@ -167,7 +169,11 @@ public class SifliFilePush {
             }
         } finally {
             close();
-        }*/
+        }
+    }
+
+    private static boolean isUploadProtocolVerified() {
+        return false; // Must be backed by captured HK8 3407 protocol evidence before enabling.
     }
 
     private void run(List<Entry> files, List<byte[]> payloads, int type, long total) throws Exception {
