@@ -20,6 +20,10 @@ typedef struct monolith_lvgl8_view {
 /* 'rgb' is original verified eZIP decoded 485x520 RGB888. */
 int monolith_lvgl8_create(monolith_lvgl8_view *view,lv_obj_t *root,
                           const uint8_t *rgb,size_t bytes);
+/* Decodes verified original eZIP directly into LVGL image buffer; temporary
+ * decoder heap = 37133 bytes, with no separate full-frame RGB888 buffer. */
+int monolith_lvgl8_create_from_ezip(monolith_lvgl8_view *view,lv_obj_t *root,
+                                    const uint8_t *ezip,size_t bytes);
 int monolith_lvgl8_set_datetime(monolith_lvgl8_view *view,
                                 unsigned hour,unsigned minute,
                                 unsigned day,unsigned month,unsigned year);
