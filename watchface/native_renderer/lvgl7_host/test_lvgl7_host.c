@@ -27,7 +27,7 @@ static void flush(lv_disp_drv_t *drv,const lv_area_t *a,lv_color_t *colors){
     lv_disp_flush_ready(drv);
 }
 int main(int argc,char **argv){
-    if(argc!=3)return 1;
+    if(argc!=3 && argc!=4)return 1;
     FILE *in=fopen(argv[1],"rb");if(!in)return 2;
     uint8_t *rgb=malloc(FRAME);if(!rgb)return 3;
     if(fread(rgb,1,FRAME,in)!=FRAME)return 4;
@@ -39,7 +39,17 @@ int main(int argc,char **argv){
     display_driver.buffer=&display_buffer;display_driver.flush_cb=flush;
     if(!lv_disp_drv_register(&display_driver))return 5;
     monolith_lvgl7_view view={0};
-    if(monolith_lvgl7_create(&view,lv_scr_act(),rgb,FRAME))return 6;
+    if(argc==4){
+        FILE *compressed=fopen(argv[3],"rb");
+        if(!compressed)return 20;
+        uint8_t *src=(uint8_t*)malloc(158937u);
+        if(!src)return 21;
+        if(fread(src,1,158937u,compressed)!=158937u)return 22;
+        fclose(compressed);
+        int result=monolith_lvgl7_create_from_ezip(&view,lv_scr_act(),src,158937u);
+        free(src);
+        if(result)return 23;
+    }else if(monolith_lvgl7_create(&view,lv_scr_act(),rgb,FRAME))return 6;
     if(monolith_lvgl7_auto_clock(&view,source,NULL))return 7;
     if(calls!=1)return 8;
     for(int i=0;i<12;i++){lv_tick_inc(30);lv_task_handler();}
