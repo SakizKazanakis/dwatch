@@ -49,7 +49,7 @@ int monolith_lvgl8_set_datetime(monolith_lvgl8_view *view,
     return 0;
 }
 static void monolith_lvgl8_clock_tick(lv_timer_t *timer){
-    monolith_lvgl8_view *view=(monolith_lvgl8_view*)lv_timer_get_user_data(timer);
+    monolith_lvgl8_view *view=(monolith_lvgl8_view*)timer->user_data;
     if(!view || !view->active || !view->time_source)return;
     unsigned h=0,m=0,d=0,mo=0,y=0;
     if(view->time_source(view->time_context,&h,&m,&d,&mo,&y)==0)
