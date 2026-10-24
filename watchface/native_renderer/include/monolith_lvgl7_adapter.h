@@ -17,6 +17,8 @@ typedef struct monolith_lvgl7_view {
 } monolith_lvgl7_view;
 int monolith_lvgl7_create(monolith_lvgl7_view *view,lv_obj_t *root,
                           const uint8_t *rgb,size_t bytes);
+int monolith_lvgl7_create_from_ezip(monolith_lvgl7_view *view,lv_obj_t *root,
+                                    const uint8_t *ezip,size_t bytes);
 int monolith_lvgl7_set_datetime(monolith_lvgl7_view *view,
                                 unsigned hour,unsigned minute,
                                 unsigned day,unsigned month,unsigned year);
