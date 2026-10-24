@@ -136,6 +136,18 @@ jobs:
           "${RUNNER_TEMP}/monolith-lvgl8/monolith_lvgl8_host_test" \
             "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_real_lvgl8_frame.ppm"
 
+      - name: Build authentic LVGL 7 and render Monolith with separate legacy API
+        run: |
+          git clone --depth 1 --branch release/v7 https://github.com/lvgl/lvgl.git "${RUNNER_TEMP}/lvgl7"
+          git -C "${RUNNER_TEMP}/lvgl7" fetch --depth 1 origin f7a17a525e51217fce56bcc6bf7e5dfcb5fb0296
+          git -C "${RUNNER_TEMP}/lvgl7" checkout --detach FETCH_HEAD
+          test "$(git -C "${RUNNER_TEMP}/lvgl7" rev-parse HEAD)" = "f7a17a525e51217fce56bcc6bf7e5dfcb5fb0296"
+          cmake -S watchface/native_renderer/lvgl7_host -B "${RUNNER_TEMP}/monolith-lvgl7" \
+            -DMONOLITH_LVGL_SOURCE="${RUNNER_TEMP}/lvgl7" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "${RUNNER_TEMP}/monolith-lvgl7" --parallel --target monolith_lvgl7_host_test
+          "${RUNNER_TEMP}/monolith-lvgl7/monolith_lvgl7_host_test" \
+            "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_real_lvgl7_frame.ppm"
+
       - name: Upload decoded pixel proof and native LVGL screenshot
         uses: actions/upload-artifact@v4
         with:
@@ -143,6 +155,7 @@ jobs:
           path: |
             ${RUNNER_TEMP}/monolith_decoded.png
             ${RUNNER_TEMP}/monolith_real_lvgl8_frame.ppm
+            ${RUNNER_TEMP}/monolith_real_lvgl7_frame.ppm
             ${RUNNER_TEMP}/monolith_frame.ppm
           retention-days: 14
 
