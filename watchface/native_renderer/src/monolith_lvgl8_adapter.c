@@ -1,4 +1,5 @@
 #include "monolith_lvgl8_adapter.h"
+#include "monolith_renderer.h"
 #if defined(MONOLITH_FREESTANDING_ARM)
 extern void *malloc(size_t);
 extern void free(void *);
@@ -9,6 +10,7 @@ extern void *memset(void *, int, size_t);
 #endif
 #define MW 485u
 #define MH 520u
+static int monolith_lvgl8_finish(monolith_lvgl8_view *view,lv_obj_t *root);
 int monolith_lvgl8_create(monolith_lvgl8_view *view,lv_obj_t *root,
                           const uint8_t *rgb,size_t bytes){
     if(!view||!root||!rgb||bytes!=MW*MH*3u||view->active)return -1;
@@ -18,6 +20,10 @@ int monolith_lvgl8_create(monolith_lvgl8_view *view,lv_obj_t *root,
     for(size_t i=0;i<MW*MH;i++)
         owned[i]=lv_color_make(rgb[3*i],rgb[3*i+1],rgb[3*i+2]);
     view->owned_pixels=owned;
+    return monolith_lvgl8_finish(view,root);
+}
+static int monolith_lvgl8_finish(monolith_lvgl8_view *view,lv_obj_t *root){
+    lv_color_t *owned=view->owned_pixels;
     view->descriptor.header.always_zero=0;
     view->descriptor.header.w=MW;view->descriptor.header.h=MH;
     view->descriptor.header.cf=LV_IMG_CF_TRUE_COLOR;
@@ -38,6 +44,34 @@ int monolith_lvgl8_create(monolith_lvgl8_view *view,lv_obj_t *root,
     lv_obj_move_foreground(view->date_label);
     view->active=1;
     return 0;
+}
+typedef struct {
+    lv_color_t *pixels;
+    unsigned rows;
+} monolith_lvgl8_stream;
+static int monolith_lvgl8_stream_row(void *context,unsigned row,const uint8_t *rgb,size_t bytes){
+    monolith_lvgl8_stream *state=(monolith_lvgl8_stream*)context;
+    if(!state || row!=state->rows || bytes!=MW*3u || row>=MH)return -1;
+    lv_color_t *dst=state->pixels+(size_t)row*MW;
+    for(unsigned x=0;x<MW;x++)
+        dst[x]=lv_color_make(rgb[x*3u],rgb[x*3u+1u],rgb[x*3u+2u]);
+    state->rows++;
+    return 0;
+}
+int monolith_lvgl8_create_from_ezip(monolith_lvgl8_view *view,lv_obj_t *root,
+                                    const uint8_t *ezip,size_t bytes){
+    if(!view||!root||!ezip||view->active)return -1;
+    memset(view,0,sizeof(*view));
+    lv_color_t *pixels=(lv_color_t*)malloc(MW*MH*sizeof(lv_color_t));
+    if(!pixels)return -2;
+    monolith_lvgl8_stream state={pixels,0};
+    if(monolith_resource_decode_scanlines(ezip,bytes,monolith_lvgl8_stream_row,&state)!=MONOLITH_OK
+            || state.rows!=MH){
+        free(pixels);
+        return -3;
+    }
+    view->owned_pixels=pixels;
+    return monolith_lvgl8_finish(view,root);
 }
 int monolith_lvgl8_set_datetime(monolith_lvgl8_view *view,
                                 unsigned hour,unsigned minute,
