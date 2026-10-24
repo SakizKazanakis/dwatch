@@ -44,7 +44,7 @@ class MemoryAudit(unittest.TestCase):
             """)
             elf=root/"probe.so"
             cmd=[shutil.which("clang") or shutil.which("clang-18") or "clang","--target=armv7a-none-eabihf","-fuse-ld=lld",
-                 "-shared","-nostdlib","-fPIC",str(src),"-o",str(elf)]
+                 "-shared","-nostdlib","-fPIC","-Wl,--allow-shlib-undefined",str(src),"-o",str(elf)]
             subprocess.run(cmd,check=True,capture_output=True,text=True)
             out=api.inspect(elf)
             self.assertEqual(out["required_external_import_count"],2)
