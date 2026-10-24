@@ -84,6 +84,18 @@ jobs:
       - name: Validate independent Monolith desktop renderer
         run: python3 -m unittest discover -s tests -p "test_monolith_offline_renderer.py" -v
 
+      - name: Decode actual Monolith eZIP and compare deterministic RGB SHA
+        run: |
+          python3 watchface/ezip/monolith_decoder.py             overlay/app/src/main/assets/monolith/clock_bg.bin             --png "${RUNNER_TEMP}/monolith_decoded.png"             --raw "${RUNNER_TEMP}/monolith_decoded.rgb"
+          python3 -m unittest discover -s tests -p 'test_monolith_ezip_decode.py' -v
+
+      - name: Native RGB renderer 1000 lifecycle tests
+        run: |
+          cmake -S watchface/native_renderer -B "${RUNNER_TEMP}/monolith-native" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "${RUNNER_TEMP}/monolith-native" --parallel
+          ctest --test-dir "${RUNNER_TEMP}/monolith-native" --output-on-failure
+          "${RUNNER_TEMP}/monolith-native/monolith_native_renderer_test"             "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_frame.ppm"
+
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Apply Monolith branding and patches
