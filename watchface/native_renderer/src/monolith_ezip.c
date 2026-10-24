@@ -189,3 +189,136 @@ int monolith_resource_decode(const uint8_t *source,size_t length,uint8_t *output
     }
     return MONOLITH_OK;
 }
+
+
+/* Low-memory alternative: maintain only the 32 KiB DEFLATE history window.
+ * It incrementally defilters bytes into the caller's output image. It still
+ * requires a full RGB output buffer; true on-device tiled VRAM output remains
+ * dependent on an unverified firmware graphics API.
+ */
+typedef struct monolith_sink {
+    uint8_t *history;
+    uint8_t *rgb_bgr;
+    size_t produced;
+    unsigned filter;
+} monolith_sink;
+
+static int monolith_sink_put(monolith_sink *s,uint8_t byte){
+    if(s->produced>=OUT_BYTES)return -1;
+    const size_t stride=MONOLITH_WIDTH*3u;
+    size_t row=s->produced/(stride+1u);
+    size_t row_index=s->produced%(stride+1u);
+    if(row_index==0){
+        if(byte>4)return -1;
+        s->filter=byte;
+    }else{
+        size_t x=row_index-1u;
+        size_t pix=row*stride+x;
+        unsigned a=x>=3u?s->rgb_bgr[pix-3u]:0;
+        unsigned b=row%32u?s->rgb_bgr[pix-stride]:0;
+        unsigned c=row%32u&&x>=3u?s->rgb_bgr[pix-stride-3u]:0;
+        unsigned f=s->filter;
+        unsigned predict=f==0?0:f==1?a:f==2?b:f==3?(a+b)/2u:paeth(a,b,c);
+        s->rgb_bgr[pix]=(uint8_t)(byte+predict);
+    }
+    s->history[s->produced & 32767u]=byte;
+    s->produced++;
+    return 0;
+}
+
+static int monolith_shared_stream(const uint8_t *src,size_t len,monolith_sink *out){
+    bits b={src,len,0,0};
+    unsigned nlit=get(&b,5)+257,ndist=get(&b,5)+1,norder=get(&b,4)+4;
+    if(nlit>286||ndist>32||b.error)return -1;
+    uint8_t clen[19]={0},all[MAX_CODES]={0};
+    for(unsigned i=0;i<norder;i++)clen[order[i]]=(uint8_t)get(&b,3);
+    huffman ct,lit,dist;
+    if(b.error||mkhuff(&ct,clen,19))return -1;
+    unsigned used=0;
+    while(used<nlit+ndist){
+        int sym=getsym(&b,&ct);
+        unsigned count=0;uint8_t value=0;
+        if(sym<0)return -1;
+        if(sym<16){all[used++]=(uint8_t)sym;continue;}
+        if(sym==16){if(!used)return -1;count=get(&b,2)+3;value=all[used-1];}
+        else if(sym==17)count=get(&b,3)+3;
+        else if(sym==18)count=get(&b,7)+11;
+        else return -1;
+        if(b.error||count>nlit+ndist-used)return -1;
+        while(count--)all[used++]=value;
+    }
+    if(mkhuff(&lit,all,nlit)||mkhuff(&dist,all+nlit,ndist)||align4(&b))return -1;
+    for(;;){
+        unsigned final=get(&b,1),kind=get(&b,2);
+        if(b.error)return -1;
+        if(kind==0){
+            b.pos=(b.pos+7u)/8u*8u;
+            unsigned count=get(&b,16),inv=get(&b,16);
+            if(b.error||((count^inv)!=65535u)||count>OUT_BYTES-out->produced)return -1;
+            while(count--){
+                uint8_t v=(uint8_t)get(&b,8);
+                if(b.error||monolith_sink_put(out,v))return -1;
+            }
+        }else if(kind==1||kind==2){
+            for(;;){
+                int sym=getsym(&b,&lit);
+                if(sym<0)return -1;
+                if(sym<256){
+                    if(monolith_sink_put(out,(uint8_t)sym))return -1;
+                }else if(sym==256)break;
+                else{
+                    unsigned idx=(unsigned)(sym-257);
+                    if(idx>=29)return -1;
+                    unsigned count=lens[idx]+get(&b,lextra[idx]);
+                    int d=getsym(&b,&dist);
+                    if(d<0||d>=30)return -1;
+                    unsigned back=dists[d]+get(&b,dextra[d]);
+                    if(b.error||back>out->produced||back>32768u||
+                       count>OUT_BYTES-out->produced)return -1;
+                    while(count--){
+                        uint8_t v=out->history[(out->produced-back)&32767u];
+                        if(monolith_sink_put(out,v))return -1;
+                    }
+                }
+            }
+        }else return -1;
+        if(align4(&b))return -1;
+        if(final)break;
+    }
+    return out->produced==OUT_BYTES?0:-1;
+}
+
+int monolith_resource_decode_lowmem(const uint8_t *source,size_t length,
+                                    uint8_t *output,size_t out_size){
+    if(!source||!output||length!=158937u||out_size<PIXEL_BYTES)
+        return MONOLITH_BAD_ARGUMENT;
+    uint32_t head=(uint32_t)source[0]|((uint32_t)source[1]<<8)|
+                  ((uint32_t)source[2]<<16)|((uint32_t)source[3]<<24);
+    if((head&31u)!=1u||((head>>10)&2047u)!=485u||
+       ((head>>21)&2047u)!=520u)return MONOLITH_BAD_ARGUMENT;
+    const uint8_t *inner=source+4;
+    uint32_t sz=((uint32_t)inner[0]<<24)|((uint32_t)inner[1]<<16)|
+                ((uint32_t)inner[2]<<8)|inner[3];
+    if(sz!=length-4u||inner[5]!=8u||inner[6]!=32u||
+       inner[8]!=1u||inner[9]!=229u||inner[10]!=2u||inner[11]!=8u||
+       inner[16]!=0u||inner[17]!=32u||inner[18]!=0u||inner[19]!=17u)
+       return MONOLITH_BAD_ARGUMENT;
+    uint32_t prev=0;
+    for(unsigned i=0;i<17u;i++){
+        const uint8_t *p=inner+20u+4u*i;
+        uint32_t at=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|
+                    ((uint32_t)p[2]<<8)|p[3];
+        if(at<=prev||at>=sz)return MONOLITH_BAD_ARGUMENT;
+        prev=at;
+    }
+    uint8_t *ring=(uint8_t*)malloc(32768u);
+    if(!ring)return MONOLITH_NO_MEMORY;
+    monolith_sink sink={ring,output,0,0};
+    int ok=monolith_shared_stream(source+STREAM_OFFSET,length-STREAM_OFFSET,&sink);
+    free(ring);
+    if(ok)return MONOLITH_BAD_ARGUMENT;
+    for(size_t i=0;i<PIXEL_BYTES;i+=3u){
+        uint8_t tmp=output[i];output[i]=output[i+2u];output[i+2u]=tmp;
+    }
+    return MONOLITH_OK;
+}
