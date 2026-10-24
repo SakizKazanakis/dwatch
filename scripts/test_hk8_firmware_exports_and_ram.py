@@ -43,9 +43,14 @@ class MemoryAudit(unittest.TestCase):
               void probe(void) { wf_obj_img_create(); lv_cont_create(); }
             """)
             elf=root/"probe.so"
-            cmd=[shutil.which("clang") or shutil.which("clang-18") or "clang","--target=armv7a-none-eabihf","-fuse-ld=lld",
-                 "-shared","-nostdlib","-fPIC","-Wl,--allow-shlib-undefined",str(src),"-o",str(elf)]
-            subprocess.run(cmd,check=True,capture_output=True,text=True)
+            obj=root/"probe.o"
+            clang=shutil.which("clang") or shutil.which("clang-18") or "clang"
+            linker=shutil.which("ld.lld") or shutil.which("ld.lld-18") or "ld.lld"
+            subprocess.run([clang,"--target=armv7a-none-eabihf","-fPIC",
+                            "-c",str(src),"-o",str(obj)],
+                           check=True,capture_output=True,text=True)
+            subprocess.run([linker,"-shared",str(obj),"-o",str(elf)],
+                           check=True,capture_output=True,text=True)
             out=api.inspect(elf)
             self.assertEqual(out["required_external_import_count"],2)
             self.assertEqual(out["requires_firmware_or_other_modules"],
