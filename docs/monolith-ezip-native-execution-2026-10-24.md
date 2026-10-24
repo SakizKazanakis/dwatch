@@ -107,3 +107,16 @@ New API: `monolith_resource_decode_scanlines(resource, length, on_row, context)`
 - CI steps added to assert streaming vs reference RGB byte-for-byte and with ASan/UBSan.
 
 **Important remaining blocker:** no confirmed HK8 board 3407 graphics API accepts these RGB scanlines, so no claim of VRAM/PSRAM feasibility, zero-copy eZIP or native on-device display is made. Public LVGL 7/8 hosts already run, but 3407 firmware requires separate ABI and resource memory verification.
+
+## 2026-10-24 continuation — direct original eZIP → LVGL7/LVGL8, no RGB888 full-frame staging
+
+New native interfaces: `monolith_lvgl7_create_from_ezip(view,root,ezip,bytes)` and `monolith_lvgl8_create_from_ezip(view,root,ezip,bytes)`, distinct per actual public LVGL major version.
+
+- Both versions now allocate the final `lv_color_t` image, call the validated `monolith_resource_decode_scanlines` callback, convert each streamed RGB888 row **directly** into the final LVGL colour buffer, and construct genuine `lv_img_create` + time/date objects. They release the final colour buffer in their existing destroy paths.
+- No full `485×520×3 = 756,600`-byte intermediate RGB888 buffer is allocated **inside this new path**.
+- The streaming decoder still needs **37,133 bytes** of working heap (32768 LZ77 history + 2 × 1455 BGR row buffers + 1455 RGB callback buffer). Public LVGL test configuration uses `LV_COLOR_DEPTH=32`, so the final image occupies **1,008,800 bytes** (`485×520×4`), plus all LVGL heap, draw buffers, compressed source, object allocations, and stack. Such requirements **have not been verified on HK8**.
+- Tests executed on the real `clock_bg.bin` in BOTH public LVGL7 and LVGL8: a direct eZIP load and a predecoded RGB load create **byte-for-byte identical 485×520 PPM frames**, and LVGL7 direct rendering is also pixel-exact with LVGL8 direct rendering. Each adapter's 1,000-cycle object lifecycle test still passed.
+- Native decoder callback uses original input CRC guard to reject modified resource bytes before dispatching any rows; a callback failure aborts decoding. Rendering is still offline-only and does not establish an OEM `ET_DYN` loader/ROM API.
+- GitHub Actions now contains direct vs predecoded and LVGL7 vs LVGL8 frame comparisons.
+
+**Remaining blockers:** actual HK8 board 3407 LVGL/RT-Thread ABI, verified OEM graphics export and usable memory/PSRAM, hardware RTC binding, ET_DYN loader registration, validated rollback and authorized physical testing. Do not enable BLE firmware writes based on host results.
