@@ -214,6 +214,11 @@ typedef struct monolith_sink {
     uint8_t *rgb_bgr;
     size_t produced;
     unsigned filter;
+    /* Optional streamed mode, using only two 1455-byte BGR rows. */
+    uint8_t *rows;
+    uint8_t *rgb_row;
+    monolith_scanline_cb on_row;
+    void *context;
 } monolith_sink;
 
 static int monolith_sink_put(monolith_sink *s,uint8_t byte){
@@ -226,13 +231,26 @@ static int monolith_sink_put(monolith_sink *s,uint8_t byte){
         s->filter=byte;
     }else{
         size_t x=row_index-1u;
-        size_t pix=row*stride+x;
-        unsigned a=x>=3u?s->rgb_bgr[pix-3u]:0;
-        unsigned b=row%32u?s->rgb_bgr[pix-stride]:0;
-        unsigned c=row%32u&&x>=3u?s->rgb_bgr[pix-stride-3u]:0;
+        uint8_t *cur=s->rows ? s->rows+(row%2u)*stride
+                             : s->rgb_bgr+row*stride;
+        const uint8_t *prev=s->rows
+              ? s->rows+((row+1u)%2u)*stride
+              : (row ? s->rgb_bgr+(row-1u)*stride : (const uint8_t*)0);
+        unsigned a=x>=3u?cur[x-3u]:0;
+        unsigned b=row%32u?prev[x]:0;
+        unsigned c=row%32u&&x>=3u?prev[x-3u]:0;
         unsigned f=s->filter;
         unsigned predict=f==0?0:f==1?a:f==2?b:f==3?(a+b)/2u:paeth(a,b,c);
-        s->rgb_bgr[pix]=(uint8_t)(byte+predict);
+        cur[x]=(uint8_t)(byte+predict);
+        if(s->on_row && x+1u==stride){
+            for(size_t i=0;i<stride;i+=3u){
+                s->rgb_row[i]=cur[i+2u];
+                s->rgb_row[i+1u]=cur[i+1u];
+                s->rgb_row[i+2u]=cur[i];
+            }
+            if(s->on_row(s->context,(unsigned)row,s->rgb_row,stride)!=0)
+                return -1;
+        }
     }
     s->history[s->produced & 32767u]=byte;
     s->produced++;
@@ -335,4 +353,47 @@ int monolith_resource_decode_lowmem(const uint8_t *source,size_t length,
         uint8_t tmp=output[i];output[i]=output[i+2u];output[i+2u]=tmp;
     }
     return MONOLITH_OK;
+}
+
+/* Streamed decoding: 32768 LZ77 + 2*1455 row buffers + 1455 RGB staging.
+ * Peak explicitly allocated working memory is 37133 bytes, plus small stack.
+ * Caller receives each row immediately; no full framebuffer is allocated here.
+ */
+int monolith_resource_decode_scanlines(const uint8_t *source,size_t length,
+                                       monolith_scanline_cb callback,void *context){
+    if(!source||!callback||length!=158937u)
+        return MONOLITH_BAD_ARGUMENT;
+    if(!monolith_original_crc_ok(source,length))return MONOLITH_BAD_ARGUMENT;
+    uint32_t head=(uint32_t)source[0]|((uint32_t)source[1]<<8)|
+                  ((uint32_t)source[2]<<16)|((uint32_t)source[3]<<24);
+    if((head&31u)!=1u||((head>>10)&2047u)!=485u||
+       ((head>>21)&2047u)!=520u)return MONOLITH_BAD_ARGUMENT;
+    const uint8_t *inner=source+4;
+    uint32_t sz=((uint32_t)inner[0]<<24)|((uint32_t)inner[1]<<16)|
+                ((uint32_t)inner[2]<<8)|inner[3];
+    if(sz!=length-4u||inner[5]!=8u||inner[6]!=32u||
+       inner[8]!=1u||inner[9]!=229u||inner[10]!=2u||inner[11]!=8u||
+       inner[16]!=0u||inner[17]!=32u||inner[18]!=0u||inner[19]!=17u)
+        return MONOLITH_BAD_ARGUMENT;
+    uint32_t prev=0;
+    for(unsigned i=0;i<17u;i++){
+        const uint8_t *p=inner+20u+4u*i;
+        uint32_t at=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|
+                    ((uint32_t)p[2]<<8)|p[3];
+        if(at<=prev||at>=sz)return MONOLITH_BAD_ARGUMENT;
+        prev=at;
+    }
+    const size_t stride=MONOLITH_WIDTH*3u;
+    uint8_t *work=(uint8_t*)malloc(32768u+stride*3u);
+    if(!work)return MONOLITH_NO_MEMORY;
+    monolith_sink sink={0};
+    sink.history=work;
+    sink.rows=work+32768u;
+    sink.rgb_row=work+32768u+stride*2u;
+    sink.on_row=callback;
+    sink.context=context;
+    const int status=monolith_shared_stream(source+STREAM_OFFSET,
+                                            length-STREAM_OFFSET,&sink);
+    free(work);
+    return status==0?MONOLITH_OK:MONOLITH_BAD_ARGUMENT;
 }
