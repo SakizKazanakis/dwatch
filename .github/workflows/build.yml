@@ -115,6 +115,10 @@ jobs:
             overlay/app/src/main/assets/monolith/clock_bg.bin \
             "${RUNNER_TEMP}/monolith_native_decoded.rgb"
           cmp "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_native_decoded.rgb"
+          "${RUNNER_TEMP}/monolith-native/monolith_native_ezip_test" \
+            overlay/app/src/main/assets/monolith/clock_bg.bin \
+            "${RUNNER_TEMP}/monolith_native_decoded_lowmem.rgb" lowmem
+          cmp "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_native_decoded_lowmem.rgb"
           printf '%s  %s\n' \
             '1b02602419be4dd7c8e9db64073df99621d6542fa0c1eb5bfec685d46d77a940' \
             "${RUNNER_TEMP}/monolith_native_decoded.rgb" | sha256sum -c -
