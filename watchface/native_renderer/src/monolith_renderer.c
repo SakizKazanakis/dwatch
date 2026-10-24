@@ -49,10 +49,6 @@ int monolith_image_create(monolith_renderer *r,const uint8_t *rgb,size_t n){
     if(!r || !r->initialized || !rgb || n!=FRAME_BYTES)return MONOLITH_BAD_ARGUMENT;
     r->background=rgb;return MONOLITH_OK;
 }
-int monolith_resource_decode(const uint8_t *r,size_t n,uint8_t *out,size_t cap){
-    (void)r;(void)n;(void)out;(void)cap;
-    return MONOLITH_BAD_STATE; /* explicitly unsupported until C eZIP decoder */
-}
 int monolith_renderer_draw(monolith_renderer *r,unsigned h,unsigned m){
     if(!r||!r->initialized||r->paused)return MONOLITH_BAD_STATE;
     if(h>23||m>59)return MONOLITH_BAD_ARGUMENT;
