@@ -120,6 +120,28 @@ jobs:
             "${RUNNER_TEMP}/monolith_native_decoded.rgb" | sha256sum -c -
           "${RUNNER_TEMP}/monolith-native/monolith_native_renderer_test"             "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_frame.ppm"
 
+      - name: Build authentic LVGL 8.3 and render original Monolith face
+        run: |
+          git clone --depth 1 --branch release/v8.3 https://github.com/lvgl/lvgl.git "${RUNNER_TEMP}/lvgl8"
+          git -C "${RUNNER_TEMP}/lvgl8" fetch --depth 1 origin fbb73d4b3ffe086a7218bd1a8e51f9e7a260c4b9
+          git -C "${RUNNER_TEMP}/lvgl8" checkout --detach FETCH_HEAD
+          test "$(git -C "${RUNNER_TEMP}/lvgl8" rev-parse HEAD)" = "fbb73d4b3ffe086a7218bd1a8e51f9e7a260c4b9"
+          cmake -S watchface/native_renderer/lvgl_host -B "${RUNNER_TEMP}/monolith-lvgl8" \
+            -DMONOLITH_LVGL_SOURCE="${RUNNER_TEMP}/lvgl8" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "${RUNNER_TEMP}/monolith-lvgl8" --parallel --target monolith_lvgl8_host_test
+          "${RUNNER_TEMP}/monolith-lvgl8/monolith_lvgl8_host_test" \
+            "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_real_lvgl8_frame.ppm"
+
+      - name: Upload decoded pixel proof and native LVGL screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: monolith-offline-renderer-evidence
+          path: |
+            ${RUNNER_TEMP}/monolith_decoded.png
+            ${RUNNER_TEMP}/monolith_real_lvgl8_frame.ppm
+            ${RUNNER_TEMP}/monolith_frame.ppm
+          retention-days: 14
+
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Apply Monolith branding and patches
