@@ -345,7 +345,9 @@ int monolith_resource_decode_lowmem(const uint8_t *source,size_t length,
     }
     uint8_t *ring=(uint8_t*)malloc(32768u);
     if(!ring)return MONOLITH_NO_MEMORY;
-    monolith_sink sink={ring,output,0,0};
+    monolith_sink sink={0};
+    sink.history=ring;
+    sink.rgb_bgr=output;
     int ok=monolith_shared_stream(source+STREAM_OFFSET,length-STREAM_OFFSET,&sink);
     free(ring);
     if(ok)return MONOLITH_BAD_ARGUMENT;
