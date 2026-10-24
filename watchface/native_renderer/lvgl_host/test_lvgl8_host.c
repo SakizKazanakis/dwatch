@@ -1,6 +1,7 @@
 #include "monolith_lvgl8_adapter.h"
 #include "monolith_renderer.h"
 #include "lvgl.h"
+#include "monolith_renderer.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,7 +35,7 @@ static int fake_clock(void *ctx,unsigned *h,unsigned *m,
     return 0;
 }
 int main(int argc,char **argv){
-    if(argc!=3)return 1;
+    if(argc!=3 && argc!=4)return 1;
     FILE *in=fopen(argv[1],"rb");if(!in)return 2;
     unsigned char *rgb=malloc(FRAME);if(!rgb)return 3;
     if(fread(rgb,1,FRAME,in)!=FRAME)return 4;
@@ -46,7 +47,17 @@ int main(int argc,char **argv){
     driver.flush_cb=flush;driver.draw_buf=&drawbuf;
     if(!lv_disp_drv_register(&driver))return 5;
     monolith_lvgl8_view view={0};
-    if(monolith_lvgl8_create(&view,lv_scr_act(),rgb,FRAME))return 6;
+    if(argc==4){
+        FILE *compressed=fopen(argv[3],"rb");
+        if(!compressed)return 25;
+        unsigned char *src=malloc(158937u);
+        if(!src)return 26;
+        if(fread(src,1,158937u,compressed)!=158937u)return 27;
+        fclose(compressed);
+        const int result=monolith_lvgl8_create_from_ezip(&view,lv_scr_act(),src,158937u);
+        free(src);
+        if(result)return 28;
+    }else if(monolith_lvgl8_create(&view,lv_scr_act(),rgb,FRAME))return 6;
     if(monolith_lvgl8_auto_clock(&view,fake_clock,NULL))return 7;
     if(provider_calls!=1)return 19;
     for(int i=0;i<12;i++){lv_tick_inc(30);lv_timer_handler();}
