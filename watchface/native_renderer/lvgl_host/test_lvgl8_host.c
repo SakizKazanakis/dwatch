@@ -1,0 +1,62 @@
+#include "monolith_lvgl8_adapter.h"
+#include "monolith_renderer.h"
+#include "lvgl.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+enum { W=485,H=520,FRAME=W*H*3 };
+static unsigned char frame[FRAME];
+static lv_color_t drawbuffer[W*20];
+static lv_disp_draw_buf_t drawbuf;
+static lv_disp_drv_t driver;
+static unsigned flushes;
+static void flush(lv_disp_drv_t *drv,const lv_area_t *a,lv_color_t *pixels){
+    for(int y=a->y1;y<=a->y2;y++){
+        if(y<0||y>=H)continue;
+        for(int x=a->x1;x<=a->x2;x++){
+            if(x<0||x>=W)continue;
+            lv_color_t v=pixels[(size_t)(y-a->y1)*(size_t)(a->x2-a->x1+1)+(size_t)(x-a->x1)];
+            size_t idx=3u*((size_t)y*W+(size_t)x);
+            frame[idx]=v.ch.red;frame[idx+1]=v.ch.green;frame[idx+2]=v.ch.blue;
+        }
+    }
+    flushes++;
+    lv_disp_flush_ready(drv);
+}
+int main(int argc,char **argv){
+    if(argc!=3)return 1;
+    FILE *in=fopen(argv[1],"rb");if(!in)return 2;
+    unsigned char *rgb=malloc(FRAME);if(!rgb)return 3;
+    if(fread(rgb,1,FRAME,in)!=FRAME)return 4;
+    fclose(in);
+    lv_init();
+    lv_disp_draw_buf_init(&drawbuf,drawbuffer,NULL,W*20);
+    lv_disp_drv_init(&driver);
+    driver.hor_res=W;driver.ver_res=H;
+    driver.flush_cb=flush;driver.draw_buf=&drawbuf;
+    if(!lv_disp_drv_register(&driver))return 5;
+    monolith_lvgl8_view view={0};
+    if(monolith_lvgl8_create(&view,lv_scr_act(),rgb,FRAME))return 6;
+    if(monolith_lvgl8_set_datetime(&view,10,46,24,10,2026))return 7;
+    for(int i=0;i<12;i++){lv_tick_inc(30);lv_timer_handler();}
+    if(flushes==0)return 8;
+    unsigned char before[FRAME];
+    memcpy(before,frame,FRAME);
+    if(monolith_lvgl8_pause(&view))return 9;
+    for(int i=0;i<4;i++){lv_tick_inc(30);lv_timer_handler();}
+    if(monolith_lvgl8_resume(&view))return 10;
+    if(monolith_lvgl8_set_datetime(&view,10,47,24,10,2026))return 11;
+    for(int i=0;i<10;i++){lv_tick_inc(30);lv_timer_handler();}
+    if(!memcmp(before,frame,FRAME))return 12;
+    FILE *out=fopen(argv[2],"wb");if(!out)return 13;
+    fprintf(out,"P6\n485 520\n255\n");
+    if(fwrite(frame,1,FRAME,out)!=FRAME)return 14;
+    fclose(out);
+    monolith_lvgl8_destroy(&view);
+    monolith_lvgl8_destroy(&view);
+    for(int i=0;i<4;i++){lv_tick_inc(30);lv_timer_handler();}
+    free(rgb);
+    printf("PASS: public LVGL8 real image/label rendering, time updated, paused/resumed, destroyed; %u flushes\n",flushes);
+    return 0;
+}
