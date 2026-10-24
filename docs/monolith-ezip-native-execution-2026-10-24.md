@@ -94,3 +94,16 @@ Status: **PHASE 05.1 PASS**, **PHASE 05.2/05.3 PARTIAL**, **PHASE 06 host graphi
 **ABI fact boundary:** public LVGL7 requires `lv_obj_align(obj,base,...)`, `lv_task_create`, `lv_obj_set_hidden`. Public LVGL8 requires `lv_obj_align(obj,...)`, `lv_timer_create`, `lv_obj_add_flag`. They are kept in separate translation units and validated against pinned official Git commits. The HK8 3407 OEM module imports names characteristic of older/vendor LVGL, but public v7 success does not establish ROM exports or true firmware version.
 
 **Remaining BLOCKED:** authenticated HK8 code3407 system firmware or vendor API headers, exact watchface loader symbol resolution, on-device executable ET_DYN, hardware-specific RTC adapter, physical RAM/PSRAM, validated rollback/recovery and authorized device installation. No writes to physical watch. Android upload remains fail-closed.
+
+## 2026-10-24 continuation — verified 37KB streamed decoder
+
+New API: `monolith_resource_decode_scanlines(resource, length, on_row, context)`.
+
+- Exact original 485×520 `clock_bg.bin` shared-Huffman stream decompressed with a **32,768-byte LZ77 history ring** + **two 1,455-byte BGR line buffers** + **one 1,455-byte RGB callback line buffer**, totalling **37,133 heap bytes** (not including caller-owned compressed BIN storage, stack, LVGL objects or display buffers).
+- Emits **520 ordered RGB888 scanlines** via borrowed callback buffer, no full output image allocation in the decoder. Callback output can be forwarded to a verified graphics transport, framebuffer converter or file. A callback failure aborts the stream and prior emitted rows cannot be rolled back; the input is CRC-validated before callbacks.
+- Native host test: ordinary, 32KB ring into full RGB, and streamed callback modes all produced identical **756,600-byte** output, SHA-256 `1b02602419be4dd7c8e9db64073df99621d6542fa0c1eb5bfec685d46d77a940`. The stream API rejected modified source before calling the output callback.
+- GCC `-fsanitize=address,undefined` stream test passed locally with `ASAN_OPTIONS=detect_leaks=0` (LeakSanitizer unavailable under remote ptrace); separately 1,000 native lifecycle iterations passed with sanitizers. This is not a leak-sanitizer PASS.
+- Native streamed decoder compiled as ARM32 EABI5 freestanding ET_REL and exported `monolith_resource_decode_scanlines`.
+- CI steps added to assert streaming vs reference RGB byte-for-byte and with ASan/UBSan.
+
+**Important remaining blocker:** no confirmed HK8 board 3407 graphics API accepts these RGB scanlines, so no claim of VRAM/PSRAM feasibility, zero-copy eZIP or native on-device display is made. Public LVGL 7/8 hosts already run, but 3407 firmware requires separate ABI and resource memory verification.
