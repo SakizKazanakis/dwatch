@@ -7,5 +7,7 @@ target_include_directories(monolith_native_renderer PUBLIC ${CMAKE_CURRENT_SOURC
 target_compile_options(monolith_native_renderer PRIVATE -Wall -Wextra -Werror)
 add_executable(monolith_native_renderer_test tests/test_renderer.c)
 target_link_libraries(monolith_native_renderer_test PRIVATE monolith_native_renderer)
+add_executable(monolith_native_ezip_test tests/test_ezip_native.c)
+target_link_libraries(monolith_native_ezip_test PRIVATE monolith_native_renderer)
 enable_testing()
 add_test(NAME monolith_native_1000_lifecycle COMMAND monolith_native_renderer_test)
