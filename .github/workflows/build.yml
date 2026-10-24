@@ -165,6 +165,10 @@ jobs:
           cmake --build "${RUNNER_TEMP}/monolith-lvgl8" --parallel --target monolith_lvgl8_host_test
           "${RUNNER_TEMP}/monolith-lvgl8/monolith_lvgl8_host_test" \
             "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_real_lvgl8_frame.ppm"
+          "${RUNNER_TEMP}/monolith-lvgl8/monolith_lvgl8_host_test" \
+            "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_lvgl8_direct_ezip.ppm" \
+            overlay/app/src/main/assets/monolith/clock_bg.bin
+          cmp "${RUNNER_TEMP}/monolith_real_lvgl8_frame.ppm" "${RUNNER_TEMP}/monolith_lvgl8_direct_ezip.ppm"
 
       - name: Build authentic LVGL 7 and render Monolith with separate legacy API
         run: |
@@ -177,6 +181,11 @@ jobs:
           cmake --build "${RUNNER_TEMP}/monolith-lvgl7" --parallel --target monolith_lvgl7_host_test
           "${RUNNER_TEMP}/monolith-lvgl7/monolith_lvgl7_host_test" \
             "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_real_lvgl7_frame.ppm"
+          "${RUNNER_TEMP}/monolith-lvgl7/monolith_lvgl7_host_test" \
+            "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_lvgl7_direct_ezip.ppm" \
+            overlay/app/src/main/assets/monolith/clock_bg.bin
+          cmp "${RUNNER_TEMP}/monolith_real_lvgl7_frame.ppm" "${RUNNER_TEMP}/monolith_lvgl7_direct_ezip.ppm"
+          cmp "${RUNNER_TEMP}/monolith_lvgl7_direct_ezip.ppm" "${RUNNER_TEMP}/monolith_lvgl8_direct_ezip.ppm"
 
       - name: Upload decoded pixel proof and native LVGL screenshot
         uses: actions/upload-artifact@v4
