@@ -68,3 +68,29 @@ Status: **PHASE 05.1 PASS**, **PHASE 05.2/05.3 PARTIAL**, **PHASE 06 host graphi
 - Memory risk: temporary eZIP 757,120 bytes + target decoded RGB 756,600 bytes; public LVGL8 32-bit true-colour image adds 1,008,800 bytes. These allocations are **not validated** for physical HK8 RAM/PSRAM.
 - The C implementation currently handles the verified original legacy-Huffman format, not arbitrary eZIP variants. Physical recovery and on-watch write mechanisms are not proven. **No device writes**.
 
+
+## Updated native low-memory and LVGL7/LVGL8 validation
+
+**Verified original source eZIP, independent implementations:**
+
+| Component | Executed check | Result |
+|---|---|---|
+| Python shared-Huffman eZIP | Original BIN → RGB → PNG, compare original PNG | PASS; 0 differing bytes |
+| C full-buffer decoder | Original BIN → RGB; compare independent Python RGB | PASS; SHA256 `1b02602419be4dd7c8e9db64073df99621d6542fa0c1eb5bfec685d46d77a940` |
+| C low-memory decoder | 32,768-byte LZ77 ring; incremental PNG defilter into caller RGB buffer | PASS; exact same SHA |
+| C framebuffer/watch time compositor | 1,000 create/draw/pause/resume/free cycles | PASS; real PPM |
+| Public LVGL 8.3 | Real image object/labels/timer/refresh/delete | PASS; 1,000 lifecycles, LVGL heap free **2,087,512→2,087,512** |
+| Public LVGL 7 | Separately compiled image object/labels/task/refresh/delete | PASS; 1,000 lifecycles, LVGL heap free **2,092,944→2,092,944** |
+| Cross-version screenshot | Same original source rendered by both LVGL versions | Exact identical PNG bytes; 150,155 B |
+| Freestanding ARM decoder/render object | ARMv7 EABI5 ELF32 **ET_REL** compilation and symbol checks | PASS; **NOT** an installable OEM ET_DYN |
+
+**Generated result files committed to the PR branch:**
+
+- `artifacts/phase05/monolith-decoded-from-ezip.png`: 148,723 bytes; SHA256 `8ae2ec682f46eed41bafe73b92bd324345bb1dd37b2b8d0231e1a0a0e2a82dbe`. Pixels derived solely from the original eZIP, not the original PNG file.
+- `artifacts/phase05/monolith-lvgl7-and-lvgl8-rendered.png`: 150,155 bytes; SHA256 `fadff72958209e34070951104306b11c3d8025a6261039c24d8f425f9be1c23b`. Rendered from original decoded pixels by independent public LVGL v7 and v8 adapters.
+
+**Memory accounting:** the streaming eZIP decoder reduces its decompression scratch from 757,120 bytes to a **32,768-byte LZ77 window**, while the caller-owned full RGB888 frame remains 756,600 bytes. The public LVGL 32-bit true-colour renderer uses an additional **1,008,800-byte** image buffer; the device's PSRAM, heap and GPU decoder are not verified. These host results therefore **do not** pass the hardware RAM acceptance criterion.
+
+**ABI fact boundary:** public LVGL7 requires `lv_obj_align(obj,base,...)`, `lv_task_create`, `lv_obj_set_hidden`. Public LVGL8 requires `lv_obj_align(obj,...)`, `lv_timer_create`, `lv_obj_add_flag`. They are kept in separate translation units and validated against pinned official Git commits. The HK8 3407 OEM module imports names characteristic of older/vendor LVGL, but public v7 success does not establish ROM exports or true firmware version.
+
+**Remaining BLOCKED:** authenticated HK8 code3407 system firmware or vendor API headers, exact watchface loader symbol resolution, on-device executable ET_DYN, hardware-specific RTC adapter, physical RAM/PSRAM, validated rollback/recovery and authorized device installation. No writes to physical watch. Android upload remains fail-closed.
