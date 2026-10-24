@@ -1,7 +1,12 @@
 #include "monolith_lvgl8_adapter.h"
+#if defined(MONOLITH_FREESTANDING_ARM)
+extern void *malloc(size_t);
+extern void free(void *);
+extern void *memset(void *, int, size_t);
+#else
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
+#endif
 #define MW 485u
 #define MH 520u
 int monolith_lvgl8_create(monolith_lvgl8_view *view,lv_obj_t *root,
@@ -39,9 +44,14 @@ int monolith_lvgl8_set_datetime(monolith_lvgl8_view *view,
                                 unsigned day,unsigned month,unsigned year){
     if(!view||!view->active)return -1;
     if(hour>23||minute>59||day<1||day>31||month<1||month>12||year>9999)return -2;
-    char t[16],d[24];
-    snprintf(t,sizeof(t),"%02u:%02u",hour,minute);
-    snprintf(d,sizeof(d),"%02u.%02u.%04u",day,month,year);
+    const char t[6]={
+        (char)('0'+hour/10),(char)('0'+hour%10),':',
+        (char)('0'+minute/10),(char)('0'+minute%10),0};
+    const char d[11]={
+        (char)('0'+day/10),(char)('0'+day%10),'.',
+        (char)('0'+month/10),(char)('0'+month%10),'.',
+        (char)('0'+year/1000),(char)('0'+year/100%10),
+        (char)('0'+year/10%10),(char)('0'+year%10),0};
     lv_label_set_text(view->time_label,t);
     lv_label_set_text(view->date_label,d);
     lv_obj_align(view->time_label,LV_ALIGN_CENTER,0,-12);
