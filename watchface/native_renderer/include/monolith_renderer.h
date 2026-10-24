@@ -31,6 +31,14 @@ int monolith_resource_decode(const uint8_t *resource,size_t length,
  * output. Validated separately; does not decode to arbitrary firmware VRAM. */
 int monolith_resource_decode_lowmem(const uint8_t *resource,size_t length,
                                     uint8_t *output,size_t output_size);
+/* Stream one complete RGB888 row (485x3 bytes) to a caller-managed display,
+ * file, or RGB565 converter. Callback must return 0 on success. The row memory
+ * is borrowed and valid only until the callback returns. Only the exact OEM
+ * Monolith type-1 eZIP resource is accepted; no physical watch writes. */
+typedef int (*monolith_scanline_cb)(void *context,unsigned row,
+                                   const uint8_t *rgb888,size_t bytes);
+int monolith_resource_decode_scanlines(const uint8_t *resource,size_t length,
+                                       monolith_scanline_cb on_row,void *context);
 /* Both native C decoders support only the verified original
  * 485x520 legacy shared-Huffman eZIP variant. */
 const uint8_t *monolith_renderer_frame(const monolith_renderer *r);
