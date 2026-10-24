@@ -98,12 +98,26 @@ jobs:
             -o "${RUNNER_TEMP}/monolith_native_arm32.o"
           readelf -h "${RUNNER_TEMP}/monolith_native_arm32.o" | grep -q 'ELF32'
           readelf -sW "${RUNNER_TEMP}/monolith_native_arm32.o" | grep -q 'monolith_renderer_draw'
+          clang --target=armv7a-none-eabihf -march=armv7-a -mthumb -mfloat-abi=hard -mfpu=vfpv3-d16 -O2 \
+            -DMONOLITH_FREESTANDING_ARM -ffreestanding -std=c11 \
+            -Iwatchface/native_renderer/include \
+            -c watchface/native_renderer/src/monolith_ezip.c \
+            -o "${RUNNER_TEMP}/monolith_ezip_arm32.o"
+          readelf -h "${RUNNER_TEMP}/monolith_ezip_arm32.o" | grep -q 'ELF32'
+          readelf -sW "${RUNNER_TEMP}/monolith_ezip_arm32.o" | grep -q 'monolith_resource_decode'
 
       - name: Native RGB renderer 1000 lifecycle tests
         run: |
           cmake -S watchface/native_renderer -B "${RUNNER_TEMP}/monolith-native" -DCMAKE_BUILD_TYPE=Release
           cmake --build "${RUNNER_TEMP}/monolith-native" --parallel
           ctest --test-dir "${RUNNER_TEMP}/monolith-native" --output-on-failure
+          "${RUNNER_TEMP}/monolith-native/monolith_native_ezip_test" \
+            overlay/app/src/main/assets/monolith/clock_bg.bin \
+            "${RUNNER_TEMP}/monolith_native_decoded.rgb"
+          cmp "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_native_decoded.rgb"
+          printf '%s  %s\n' \
+            '1b02602419be4dd7c8e9db64073df99621d6542fa0c1eb5bfec685d46d77a940' \
+            "${RUNNER_TEMP}/monolith_native_decoded.rgb" | sha256sum -c -
           "${RUNNER_TEMP}/monolith-native/monolith_native_renderer_test"             "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_frame.ppm"
 
       - uses: gradle/actions/setup-gradle@v4
