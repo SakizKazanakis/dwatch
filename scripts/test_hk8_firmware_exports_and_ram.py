@@ -2,6 +2,7 @@
 import importlib.util
 import pathlib
 import subprocess
+import shutil
 import tempfile
 import unittest
 
@@ -42,7 +43,7 @@ class MemoryAudit(unittest.TestCase):
               void probe(void) { wf_obj_img_create(); lv_cont_create(); }
             """)
             elf=root/"probe.so"
-            cmd=["clang","--target=armv7a-none-eabihf","-fuse-ld=lld",
+            cmd=[shutil.which("clang") or shutil.which("clang-18") or "clang","--target=armv7a-none-eabihf","-fuse-ld=lld",
                  "-shared","-nostdlib","-fPIC",str(src),"-o",str(elf)]
             subprocess.run(cmd,check=True,capture_output=True,text=True)
             out=api.inspect(elf)
