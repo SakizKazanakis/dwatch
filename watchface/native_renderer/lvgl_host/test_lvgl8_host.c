@@ -68,7 +68,25 @@ int main(int argc,char **argv){
     monolith_lvgl8_destroy(&view);
     monolith_lvgl8_destroy(&view);
     for(int i=0;i<4;i++){lv_tick_inc(30);lv_timer_handler();}
+    lv_mem_monitor_t mem_before={0},mem_after={0};
+    lv_mem_monitor(&mem_before);
+    for(unsigned i=0;i<1000;i++){
+        monolith_lvgl8_view repeat={0};
+        if(monolith_lvgl8_create(&repeat,lv_scr_act(),rgb,FRAME))return 20;
+        if(monolith_lvgl8_auto_clock(&repeat,fake_clock,NULL))return 21;
+        if(monolith_lvgl8_pause(&repeat)||monolith_lvgl8_resume(&repeat))return 22;
+        monolith_lvgl8_destroy(&repeat);
+        if(repeat.active || repeat.owned_pixels || repeat.timer)return 23;
+    }
+    for(int i=0;i<6;i++){lv_tick_inc(30);lv_timer_handler();}
+    lv_mem_monitor(&mem_after);
+    if(mem_after.free_size+1024u<mem_before.free_size){
+        fprintf(stderr,"LVGL heap leak: free before=%u after=%u\n",
+                (unsigned)mem_before.free_size,(unsigned)mem_after.free_size);
+        return 24;
+    }
     free(rgb);
-    printf("PASS: public LVGL8 real image/label rendering, time updated, paused/resumed, destroyed; %u flushes\n",flushes);
+    printf("PASS: public LVGL8 display, timer, 1000 lifecycle iterations, LVGL free bytes %u->%u; %u flushes\n",
+           (unsigned)mem_before.free_size,(unsigned)mem_after.free_size,flushes);
     return 0;
 }
