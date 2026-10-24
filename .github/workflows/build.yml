@@ -89,6 +89,16 @@ jobs:
           python3 watchface/ezip/monolith_decoder.py             overlay/app/src/main/assets/monolith/clock_bg.bin             --png "${RUNNER_TEMP}/monolith_decoded.png"             --raw "${RUNNER_TEMP}/monolith_decoded.rgb"
           python3 -m unittest discover -s tests -p 'test_monolith_ezip_decode.py' -v
 
+      - name: ARM32 freestanding native renderer compile and symbol inspection
+        run: |
+          clang --target=armv7a-none-eabihf -march=armv7-a -mthumb -mfloat-abi=hard -mfpu=vfpv3-d16 -O2 \
+            -DMONOLITH_FREESTANDING_ARM -ffreestanding -std=c11 \
+            -Iwatchface/native_renderer/include \
+            -c watchface/native_renderer/src/monolith_renderer.c \
+            -o "${RUNNER_TEMP}/monolith_native_arm32.o"
+          readelf -h "${RUNNER_TEMP}/monolith_native_arm32.o" | grep -q 'ELF32'
+          readelf -sW "${RUNNER_TEMP}/monolith_native_arm32.o" | grep -q 'monolith_renderer_draw'
+
       - name: Native RGB renderer 1000 lifecycle tests
         run: |
           cmake -S watchface/native_renderer -B "${RUNNER_TEMP}/monolith-native" -DCMAKE_BUILD_TYPE=Release
