@@ -124,6 +124,27 @@ jobs:
             "${RUNNER_TEMP}/monolith_native_decoded.rgb" | sha256sum -c -
           "${RUNNER_TEMP}/monolith-native/monolith_native_renderer_test"             "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith_frame.ppm"
 
+      - name: Sanitizer stress and corruption rejection for native eZIP
+        run: |
+          cmake -S watchface/native_renderer -B "${RUNNER_TEMP}/monolith-sanitize" \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -O1 -g" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+          cmake --build "${RUNNER_TEMP}/monolith-sanitize" --parallel
+          ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 \
+            ctest --test-dir "${RUNNER_TEMP}/monolith-sanitize" --output-on-failure
+          ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 \
+            "${RUNNER_TEMP}/monolith-sanitize/monolith_native_ezip_test" \
+            overlay/app/src/main/assets/monolith/clock_bg.bin \
+            "${RUNNER_TEMP}/monolith-sanitize-full.rgb"
+          ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 \
+            "${RUNNER_TEMP}/monolith-sanitize/monolith_native_ezip_test" \
+            overlay/app/src/main/assets/monolith/clock_bg.bin \
+            "${RUNNER_TEMP}/monolith-sanitize-lowmem.rgb" lowmem
+          cmp "${RUNNER_TEMP}/monolith-sanitize-full.rgb" "${RUNNER_TEMP}/monolith-sanitize-lowmem.rgb"
+          cmp "${RUNNER_TEMP}/monolith_decoded.rgb" "${RUNNER_TEMP}/monolith-sanitize-lowmem.rgb"
+
       - name: Build authentic LVGL 8.3 and render original Monolith face
         run: |
           git clone --depth 1 --branch release/v8.3 https://github.com/lvgl/lvgl.git "${RUNNER_TEMP}/lvgl8"
