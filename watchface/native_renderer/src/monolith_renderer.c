@@ -1,6 +1,13 @@
 #include "monolith_renderer.h"
+#if defined(MONOLITH_FREESTANDING_ARM)
+extern void *malloc(size_t);
+extern void free(void *);
+extern void *memcpy(void *, const void *, size_t);
+extern void *memset(void *, int, size_t);
+#else
 #include <stdlib.h>
 #include <string.h>
+#endif
 enum { FRAME_BYTES = MONOLITH_WIDTH * MONOLITH_HEIGHT * MONOLITH_CHANNELS };
 static const unsigned char digit[10][7] = {
 {0x0e,0x11,0x13,0x15,0x19,0x11,0x0e},
