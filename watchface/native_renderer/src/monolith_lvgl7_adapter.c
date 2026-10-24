@@ -1,8 +1,10 @@
 #include "monolith_lvgl7_adapter.h"
+#include "monolith_renderer.h"
 #include <stdlib.h>
 #include <string.h>
 #define MW 485u
 #define MH 520u
+static int monolith_lvgl7_finish(monolith_lvgl7_view *v,lv_obj_t *root);
 int monolith_lvgl7_create(monolith_lvgl7_view *v,lv_obj_t *root,
                           const uint8_t *rgb,size_t bytes){
     if(!v||!root||!rgb||bytes!=MW*MH*3u||v->active)return -1;
@@ -11,6 +13,9 @@ int monolith_lvgl7_create(monolith_lvgl7_view *v,lv_obj_t *root,
     if(!v->owned_pixels)return -2;
     for(size_t i=0;i<MW*MH;i++)
         v->owned_pixels[i]=lv_color_make(rgb[3*i],rgb[3*i+1],rgb[3*i+2]);
+    return monolith_lvgl7_finish(v,root);
+}
+static int monolith_lvgl7_finish(monolith_lvgl7_view *v,lv_obj_t *root){
     v->descriptor.header.always_zero=0;
     v->descriptor.header.w=MW;
     v->descriptor.header.h=MH;
@@ -30,6 +35,35 @@ int monolith_lvgl7_create(monolith_lvgl7_view *v,lv_obj_t *root,
     lv_obj_align(v->date_label,NULL,LV_ALIGN_CENTER,0,42);
     v->active=1;
     return 0;
+}
+typedef struct monolith_lvgl7_stream {
+    lv_color_t *pixels;
+    unsigned rows;
+} monolith_lvgl7_stream;
+static int monolith_lvgl7_scanline(void *opaque,unsigned row,
+                                  const uint8_t *rgb,size_t bytes){
+    monolith_lvgl7_stream *state=(monolith_lvgl7_stream*)opaque;
+    if(!state||row!=state->rows||bytes!=MW*3u||row>=MH)return -1;
+    lv_color_t *dst=state->pixels+(size_t)row*MW;
+    for(unsigned x=0;x<MW;x++)
+        dst[x]=lv_color_make(rgb[3u*x],rgb[3u*x+1u],rgb[3u*x+2u]);
+    state->rows++;
+    return 0;
+}
+int monolith_lvgl7_create_from_ezip(monolith_lvgl7_view *v,lv_obj_t *root,
+                                    const uint8_t *ezip,size_t bytes){
+    if(!v||!root||!ezip||v->active)return -1;
+    memset(v,0,sizeof(*v));
+    lv_color_t *pixels=(lv_color_t*)malloc(MW*MH*sizeof(lv_color_t));
+    if(!pixels)return -2;
+    monolith_lvgl7_stream stream={pixels,0};
+    if(monolith_resource_decode_scanlines(ezip,bytes,monolith_lvgl7_scanline,&stream)!=MONOLITH_OK
+        || stream.rows!=MH){
+        free(pixels);
+        return -3;
+    }
+    v->owned_pixels=pixels;
+    return monolith_lvgl7_finish(v,root);
 }
 int monolith_lvgl7_set_datetime(monolith_lvgl7_view *v,
                                 unsigned h,unsigned m,unsigned d,unsigned mo,unsigned y){
