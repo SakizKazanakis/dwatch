@@ -23,7 +23,7 @@ int main(int argc,char **argv){
     monolith_renderer_deinit(&r);
     if(monolith_renderer_allocated(&r)!=0)return 12;
   }
-  if(monolith_resource_decode(source,n,source,n)!=MONOLITH_BAD_STATE)return 13;
+  if(monolith_resource_decode(source,n,source,n)!=MONOLITH_BAD_ARGUMENT)return 13;
   if(argc>=3){
     FILE *in=fopen(argv[1],"rb");
     if(!in)return 14;
