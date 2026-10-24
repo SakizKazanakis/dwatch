@@ -3,6 +3,10 @@
 #define LV_CONF_H
 #include <stdint.h>
 #define LV_COLOR_DEPTH 32
+typedef int16_t lv_coord_t;
+#define LV_HOR_RES_MAX 485
+#define LV_VER_RES_MAX 520
+#define LV_DPI 130
 #define LV_MEM_CUSTOM 0
 #define LV_MEM_SIZE (2U * 1024U * 1024U)
 #define LV_USE_IMG 1
