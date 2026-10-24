@@ -19,6 +19,18 @@ extern void free(void *);
 #define PIXEL_BYTES (MONOLITH_HEIGHT * MONOLITH_WIDTH * 3)
 #define STREAM_OFFSET (4u+88u)
 #define MAX_CODES 320
+/* CRC32/IEEE of the user's exact original clock_bg.bin, verified offline
+ * against SHA256. This decoder is intentionally source-specific. */
+static int monolith_original_crc_ok(const uint8_t *input,size_t n){
+    uint32_t crc=0xffffffffu;
+    for(size_t i=0;i<n;i++){
+        crc^=input[i];
+        for(unsigned k=0;k<8u;k++)
+            crc=(crc&1u)?(crc>>1)^0xedb88320u:(crc>>1);
+    }
+    return (~crc)==0x8735d151u;
+}
+
 
 static const uint16_t lens[29]={3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258};
 static const uint8_t lextra[29]={0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0};
@@ -144,6 +156,7 @@ static unsigned paeth(unsigned a,unsigned b,unsigned c){
 }
 int monolith_resource_decode(const uint8_t *source,size_t length,uint8_t *output,size_t out_size){
     if(!source||!output||out_size<PIXEL_BYTES || length!=158937u)return MONOLITH_BAD_ARGUMENT;
+    if(!monolith_original_crc_ok(source,length))return MONOLITH_BAD_ARGUMENT;
     uint32_t image=(uint32_t)source[0]|((uint32_t)source[1]<<8)
          |((uint32_t)source[2]<<16)|((uint32_t)source[3]<<24);
     if((image&31u)!=1u || ((image>>10)&2047u)!=485u ||
@@ -292,6 +305,7 @@ int monolith_resource_decode_lowmem(const uint8_t *source,size_t length,
                                     uint8_t *output,size_t out_size){
     if(!source||!output||length!=158937u||out_size<PIXEL_BYTES)
         return MONOLITH_BAD_ARGUMENT;
+    if(!monolith_original_crc_ok(source,length))return MONOLITH_BAD_ARGUMENT;
     uint32_t head=(uint32_t)source[0]|((uint32_t)source[1]<<8)|
                   ((uint32_t)source[2]<<16)|((uint32_t)source[3]<<24);
     if((head&31u)!=1u||((head>>10)&2047u)!=485u||
