@@ -27,9 +27,12 @@ void monolith_renderer_deinit(monolith_renderer *r);
 int monolith_image_create(monolith_renderer *r,const uint8_t *rgb,size_t length);
 int monolith_resource_decode(const uint8_t *resource,size_t length,
                              uint8_t *output,size_t output_size);
-/* Fully supported decoder for this format lives in
- * watchface/ezip/monolith_decoder.py. C decoder unsupported until ported;
- * returns BAD_STATE, never pretends to decode. */
+/* Low-memory shared-Huffman decoder: 32 KiB LZ77 history, caller-owned RGB
+ * output. Validated separately; does not decode to arbitrary firmware VRAM. */
+int monolith_resource_decode_lowmem(const uint8_t *resource,size_t length,
+                                    uint8_t *output,size_t output_size);
+/* Both native C decoders support only the verified original
+ * 485x520 legacy shared-Huffman eZIP variant. */
 const uint8_t *monolith_renderer_frame(const monolith_renderer *r);
 size_t monolith_renderer_allocated(const monolith_renderer *r);
 #ifdef __cplusplus
